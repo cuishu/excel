@@ -27,7 +27,7 @@ Sheet1
 
 ```go
 type Human {
-	ID   int    `xlsx:"id"`
+    ID   int    `xlsx:"id"`
     Name string `xlsx:"name"`
 }
 ```
