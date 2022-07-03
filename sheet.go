@@ -3,13 +3,15 @@ package excel
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"reflect"
 	"strings"
 
-	excelize "github.com/360EntSecGroup-Skylar/excelize/v2"
+	excelize "github.com/xuri/excelize/v2"
 )
 
 const defaultSheet = "Sheet1"
@@ -20,6 +22,20 @@ type Sheet struct {
 	Filename string
 	Sheet    string
 	filter   Schema
+	reader   io.Reader
+}
+
+func NewSheetFromReader(r io.Reader, sheet string) *Sheet {
+	return &Sheet{Sheet: sheet, reader: r}
+}
+
+func (s Sheet) excelizeOpen() (*excelize.File, error) {
+	if s.Filename != "" {
+		return excelize.OpenFile(s.Filename)
+	} else if s.reader != nil {
+		return excelize.OpenReader(s.reader)
+	}
+	return nil, errors.New("filename can not be empty")
 }
 
 func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
@@ -116,7 +132,7 @@ func (s Sheet) Scan(v interface{}) error {
 	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
 		panic("param must be slice pointer")
 	}
-	f, err := excelize.OpenFile(s.Filename)
+	f, err := s.excelizeOpen()
 	if err != nil {
 		return err
 	}

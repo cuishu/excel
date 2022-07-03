@@ -57,3 +57,35 @@ func TestScan(t *testing.T) {
 	fmt.Println(example.Animal)
 	os.Remove("b.xlsx")
 }
+
+func TestScanFromReader(t *testing.T) {
+	example := ExcelExample{
+		Human:  []Human{{1, "Smith"}},
+		Animal: []Animal{{1, "Wolverine"}},
+	}
+	buff, err := Excel{}.Export(&example)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	ioutil.WriteFile("b.xlsx", buff.Bytes(), 0644)
+	defer os.Remove("b.xlsx")
+
+	file, err := os.Open("b.xlsx")
+	if err != nil {
+		t.FailNow()
+	}
+	defer file.Close()
+	var data ExcelExample
+	xlsx := NewExcelFromReader(file)
+	if err = xlsx.Scan(&data); err != nil {
+		t.FailNow()
+	}
+	fmt.Println(data)
+
+	xlsx = NewExcelFromReader(nil)
+	if err = xlsx.Scan(&data); err == nil {
+		t.FailNow()
+	}
+}

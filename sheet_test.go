@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/360EntSecGroup-Skylar/excelize/v2"
+	excelize "github.com/xuri/excelize/v2"
 )
 
 const (
@@ -125,4 +125,34 @@ func TestPicWithURL(t *testing.T) {
 	}
 	ioutil.WriteFile("a.xlsx", buff.Bytes(), 0644)
 	os.Remove("a.xlsx")
+}
+
+func TestSheetScanFromReader(t *testing.T) {
+	e := &Sheet{Sheet: "Sheet3"}
+	buff, err := e.Export(&[]TestObject{
+		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", PicFormat{0.1, 0.1}), Cell{}},
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+		t.FailNow()
+	}
+	ioutil.WriteFile("b.xlsx", buff.Bytes(), 0644)
+	defer os.Remove("b.xlsx")
+
+	file, err := os.Open("b.xlsx")
+	if err != nil {
+		t.FailNow()
+	}
+	defer file.Close()
+	var data []TestObject
+	xlsx := NewSheetFromReader(file, e.Sheet)
+	if err = xlsx.Scan(&data); err != nil {
+		t.FailNow()
+	}
+	fmt.Println(data)
+
+	xlsx = NewSheetFromReader(nil, e.Sheet)
+	if err = xlsx.Scan(&data); err == nil {
+		t.FailNow()
+	}
 }

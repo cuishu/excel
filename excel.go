@@ -3,13 +3,19 @@ package excel
 import (
 	"bytes"
 	"errors"
+	"io"
 	"reflect"
 
-	"github.com/360EntSecGroup-Skylar/excelize/v2"
+	excelize "github.com/xuri/excelize/v2"
 )
 
 type Excel struct {
 	Filename string
+	reader   io.Reader
+}
+
+func NewExcelFromReader(r io.Reader) *Excel {
+	return &Excel{reader: r}
 }
 
 func getFieldName(field reflect.StructField) string {
@@ -18,6 +24,15 @@ func getFieldName(field reflect.StructField) string {
 		return tag
 	}
 	return field.Name
+}
+
+func (e Excel) excelizeOpen() (*excelize.File, error) {
+	if e.Filename != "" {
+		return excelize.OpenFile(e.Filename)
+	} else if e.reader != nil {
+		return excelize.OpenReader(e.reader)
+	}
+	return nil, errors.New("filename can not be empty")
 }
 
 func (e Excel) Scan(v interface{}) error {
@@ -31,7 +46,7 @@ func (e Excel) Scan(v interface{}) error {
 		return errors.New("param type must be struct ptr")
 	}
 	rt := rv.Type()
-	f, err := excelize.OpenFile(e.Filename)
+	f, err := e.excelizeOpen()
 	if err != nil {
 		return err
 	}

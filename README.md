@@ -2,7 +2,7 @@
 
 Excel is a library to assist in manipulating Excel file.
 
-Powered by github.com/360EntSecGroup-Skylar/excelize/v2 
+Powered by github.com/qax-os/excelize
 
 ## Get excel
 
@@ -36,7 +36,10 @@ type Human {
 
 ```go
 var humans []Human
+// Read from file
 Sheet{Filename: "a.xlsx", Sheet: "Sheet1"}.Scan(&humans)
+// Read from reader
+NewSheetFromReader(reader, "Sheet1").Scan(&humans)
 
 for _, human := range humans {
   fmt.Println(human.Name)
@@ -90,6 +93,8 @@ var example Example
 
 // Read
 (Excel{Filename: "b.xlsx"}).Scan(&example)
+// Read from io.Reader
+NewExcelFromReader(reader).Scan(&example)
 
 // To bytes buffer
 Excel{}.Export(&example)
