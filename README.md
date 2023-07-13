@@ -99,6 +99,17 @@ NewExcelFromReader(reader).Scan(&example)
 // To bytes buffer
 Excel{}.Export(&example)
 ```
+
+## Offset
+If the header is not in the first row, then you should use offset, which defaults to 0
+
+```go
+e := Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+var ss []TestObject
+e.Offset(1).Scan(&ss)
+...
+```
+
 ## Advance
 
 You can use custom types to implement MarshalXLSX and UnmarshalXLSX to implement type convert.

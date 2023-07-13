@@ -156,3 +156,13 @@ func TestSheetScanFromReader(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func TestOffset(t *testing.T) {
+	e := Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+	var ss []TestObject
+	e.Offset(1).Scan(&ss)
+	for _, s := range ss {
+		fmt.Println(s.Name, s.Sex)
+	}
+	t.Fail()
+}

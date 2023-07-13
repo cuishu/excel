@@ -12,10 +12,16 @@ import (
 type Excel struct {
 	Filename string
 	reader   io.Reader
+	offset   int
 }
 
 func NewExcelFromReader(r io.Reader) *Excel {
 	return &Excel{reader: r}
+}
+
+func (e *Excel) Offset(n int) *Excel {
+	e.offset = n
+	return e
 }
 
 func getFieldName(field reflect.StructField) string {
@@ -51,7 +57,7 @@ func (e Excel) Scan(v interface{}) error {
 		return err
 	}
 	for i := 0; i < rt.NumField(); i++ {
-		Sheet{Sheet: getFieldName(rt.Field(i))}.scanSheet(f, rv.Field(i).Addr())
+		Sheet{Sheet: getFieldName(rt.Field(i))}.Offset(e.offset).scanSheet(f, rv.Field(i).Addr())
 	}
 
 	return nil

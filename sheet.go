@@ -22,11 +22,17 @@ type Sheet struct {
 	Filename string
 	Sheet    string
 	filter   Schema
+	offset   int
 	reader   io.Reader
 }
 
 func NewSheetFromReader(r io.Reader, sheet string) *Sheet {
 	return &Sheet{Sheet: sheet, reader: r}
+}
+
+func (s Sheet) Offset(n int) Sheet {
+	s.offset = n
+	return s
 }
 
 func (s Sheet) excelizeOpen() (*excelize.File, error) {
@@ -47,6 +53,11 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	}
 	var schema []string
 	var length int = len(rows)
+	if length <= s.offset {
+		return fmt.Errorf("file rows less than %d", s.offset+1)
+	}
+	rows = rows[s.offset:]
+	length = len(rows)
 	array := reflect.MakeSlice(rv.Type().Elem(), length-1, length)
 	var indexArr []int
 	n := 0
