@@ -80,7 +80,7 @@ type TestObject struct {
 func TestExportAndScan(t *testing.T) {
 	e := &Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
 	buff, err := e.Export(&[]TestObject{
-		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", PicFormat{0.1, 0.1}), Cell{}},
+		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", nil), Cell{}},
 	})
 	if err != nil {
 		fmt.Println(err.Error())
@@ -93,11 +93,12 @@ func TestExportAndScan(t *testing.T) {
 		fmt.Println(s.Name, s.Sex)
 	}
 	// os.Remove("a.xlsx")
+	t.Fail()
 }
 
 func TestPicWithURL(t *testing.T) {
 	url := "a.png"
-	pic := NewPicture(url, PicFormat{XScale: 0.01, YScale: 0.01})
+	pic := NewPicture(url, nil)
 	var objs []TestObject = make([]TestObject, 2)
 	objs[0] = TestObject{Name: "嬴政", Sex: Male, Age: 25, Time: Time{Time: time.Now()}, Pic: pic, HyperLink: Cell{
 		Value: "123",
@@ -130,7 +131,7 @@ func TestPicWithURL(t *testing.T) {
 func TestSheetScanFromReader(t *testing.T) {
 	e := &Sheet{Sheet: "Sheet3"}
 	buff, err := e.Export(&[]TestObject{
-		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", PicFormat{0.1, 0.1}), Cell{}},
+		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", nil), Cell{}},
 	})
 	if err != nil {
 		fmt.Println(err.Error())

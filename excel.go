@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"strings"
 
 	excelize "github.com/xuri/excelize/v2"
 )
@@ -25,7 +26,7 @@ func (e *Excel) Offset(n int) *Excel {
 }
 
 func getFieldName(field reflect.StructField) string {
-	tag := field.Tag.Get("xlsx")
+	tag := strings.TrimSpace(field.Tag.Get("xlsx"))
 	if tag != "" {
 		return tag
 	}

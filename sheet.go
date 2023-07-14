@@ -2,7 +2,6 @@ package excel
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	_ "image/jpeg"
@@ -11,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/cuishu/functools"
 	excelize "github.com/xuri/excelize/v2"
 )
 
@@ -64,7 +64,7 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	for i, row := range rows {
 		var obj map[string]string = make(map[string]string)
 		if i == 0 {
-			schema = append(schema, row...)
+			schema = append(schema, functools.Map(func(s string) string { return strings.TrimSpace(s) }, row)...)
 			continue
 		}
 		for j, cell := range row {
@@ -106,13 +106,20 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 			}
 			if rv, err := getReflectValue(value, fieldType.Elem()); err == nil {
 				if fieldType.Elem() == picReflectType {
-					var pic Picture
+					var pictures []Picture
 					var err error
-					pic.Name, pic.File, err = f.GetPicture(s.Sheet, cell(i+1, j))
+					pics, err := f.GetPictures(s.Sheet, cell(i+1, j))
 					if err != nil {
 						return err
 					}
-					rv = reflect.ValueOf(pic)
+					pictures = functools.Map(func(pic excelize.Picture) Picture {
+						return Picture{
+							File:     pic.File,
+							Format:   (*PicFormat)(pic.Format),
+							withPath: false,
+						}
+					}, pics)
+					rv = reflect.ValueOf(pictures)
 				}
 				o.Elem().Field(j).Set(rv)
 			} else {
@@ -179,17 +186,15 @@ func exportTitle(f *excelize.File, schema Schema, sheet string, t reflect.Type, 
 func (s *Sheet) exportPic(f *excelize.File, field reflect.Value, col column) error {
 	pic := field.Interface().(Picture)
 	if pic.withPath {
-		if err := f.AddPicture(s.Sheet, col(), pic.Name, pic.Format.String()); err != nil {
+		if err := f.AddPicture(s.Sheet, col(), pic.Name, (*excelize.GraphicOptions)(pic.Format)); err != nil {
 			return err
 		}
 	} else {
-		names := strings.Split(pic.Name, ".")
-		n := len(names) - 1
 		if err := f.AddPictureFromBytes(s.Sheet, col(),
-			pic.Format.String(),
-			strings.Join(names[:n], "."),
-			"."+names[n],
-			pic.File); err != nil {
+			&excelize.Picture{
+				File:   pic.File,
+				Format: (*excelize.GraphicOptions)(pic.Format),
+			}); err != nil {
 			return err
 		}
 	}
@@ -203,11 +208,7 @@ func (s *Sheet) exportCell(f *excelize.File, field reflect.Value, col column) er
 		f.SetCellStr(s.Sheet, column, c.Value)
 		f.SetCellHyperLink(s.Sheet, column, c.HyperLink.Link, string(c.HyperLink.Type))
 		if c.Style != nil {
-			data, err := json.Marshal(c.Style)
-			if err != nil {
-				return err
-			}
-			style, err := f.NewStyle(string(data))
+			style, err := f.NewStyle(c.Style)
 			if err != nil {
 				return err
 			}
@@ -290,7 +291,11 @@ func (s *Sheet) exportRows(f *excelize.File, slice reflect.Value) error {
 func (s *Sheet) sheetExport(f *excelize.File, rv reflect.Value) error {
 	t := rv.Type().Elem().Elem()
 
-	f.SetActiveSheet(f.NewSheet(s.Sheet))
+	sheet, err := f.NewSheet(s.Sheet)
+	if err != nil {
+		return err
+	}
+	f.SetActiveSheet(sheet)
 
 	exportTitle(f, s.filter, s.Sheet, t, cellGenerator(1))
 

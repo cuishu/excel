@@ -2,30 +2,19 @@ package excel
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"reflect"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/xuri/excelize/v2"
 )
 
-type PicFormat struct {
-	XScale float64 `json:"x_scale"`
-	YScale float64 `json:"y_scale"`
-}
-
-func (format PicFormat) String() string {
-	if format.XScale == 0 && format.YScale == 0 {
-		return ""
-	}
-	js, _ := json.Marshal(&format)
-	return string(js)
-}
+type PicFormat excelize.GraphicOptions
 
 type Picture struct {
 	Name     string
 	File     []byte
-	Format   PicFormat
+	Format   *PicFormat
 	withPath bool
 }
 
@@ -40,7 +29,7 @@ func getPicExtName(mime string) (string, error) {
 	}
 }
 
-func NewPicture(path string, format PicFormat) Picture {
+func NewPicture(path string, format *PicFormat) Picture {
 	return Picture{
 		Name:     path,
 		Format:   format,
@@ -48,7 +37,7 @@ func NewPicture(path string, format PicFormat) Picture {
 	}
 }
 
-func NewPictureFromBytes(file []byte, format PicFormat) (Picture, error) {
+func NewPictureFromBytes(file []byte, format *PicFormat) (Picture, error) {
 	extName, err := getPicExtName(mimetype.Detect(file).String())
 	if err != nil {
 		return Picture{}, err
