@@ -105,6 +105,13 @@ func toString(v interface{}) string {
 	return fmt.Sprintf("%v", v)
 }
 
+func isTime(rt reflect.Type) bool {
+	if rt.PkgPath() == "time" && rt.Name() == "Time" {
+		return true
+	}
+	return false
+}
+
 var validate = validator.New()
 
 var twentySixTable = []string{"", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}

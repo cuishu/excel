@@ -8,6 +8,7 @@ import (
 	_ "image/png"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/cuishu/functools"
@@ -44,7 +45,20 @@ func (s Sheet) excelizeOpen() (*excelize.File, error) {
 	return nil, errors.New("filename can not be empty")
 }
 
+func (s Sheet) timeStyle(f *excelize.File, rv reflect.Value) int {
+	fmtCode := "yyyy/mm/dd hh:mm:ss"
+	styleID, _ := f.NewStyle(&excelize.Style{CustomNumFmt: &fmtCode})
+	return styleID
+}
+
 func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
+	props, err := f.GetWorkbookProps()
+	if err != nil {
+		return err
+	}
+
+	date1904 := *props.Date1904
+
 	t := rv.Type().Elem().Elem()
 
 	rows, err := f.GetRows(s.Sheet)
@@ -105,6 +119,32 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				}
 			}
 			if rv, err := getReflectValue(value, fieldType.Elem()); err == nil {
+				if isTime(fieldType.Elem()) {
+					// styleID := s.timeStyle(f, rv)
+					for col, elem := range row {
+						if elem == value {
+							cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
+							if err != nil {
+								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+							}
+							// f.SetCellStyle(s.Sheet, cellName, cellName, styleID)
+							value, err := f.GetCellValue(s.Sheet, cellName, excelize.Options{RawCellValue: true})
+							if err != nil {
+								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+							}
+							v, err := strconv.ParseFloat(value, 64)
+							if err != nil {
+								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+							}
+							t, err := excelize.ExcelDateToTime(v, date1904)
+							if err != nil {
+								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+							}
+							o.Elem().Field(j).Set(reflect.ValueOf(t))
+						}
+					}
+					goto validate
+				}
 				if fieldType.Elem() == picReflectType {
 					var pictures []Picture
 					var err error
@@ -121,6 +161,7 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 					}, pics)
 					rv = reflect.ValueOf(pictures)
 				}
+				fmt.Println(value)
 				o.Elem().Field(j).Set(rv)
 			} else {
 				return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
@@ -220,7 +261,7 @@ func (s *Sheet) exportCell(f *excelize.File, field reflect.Value, col column) er
 	return nil
 }
 
-func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) error {
+func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column, row int) error {
 	if field.Type() == picReflectType {
 		return s.exportPic(f, field, col)
 	} else if field.Type() == cellReflectType {
@@ -236,18 +277,20 @@ func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) 
 			return err
 		}
 		f.SetCellStr(s.Sheet, col(), toString(res[0].Interface()))
+	} else if isTime(field.Type()) {
+		f.SetCellValue(s.Sheet, col(), field.Interface())
 	} else {
 		panic("struct type must implement MarshalXLSX")
 	}
 	return nil
 }
 
-func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column) error {
+func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column, row int) error {
 	t := obj.Type()
 	for i := 0; i < obj.NumField(); i++ {
 		field := obj.Field(i)
 		if field.Kind() == reflect.Struct {
-			if err := s.exportStruct(f, field, col); err != nil {
+			if err := s.exportStruct(f, field, col, row); err != nil {
 				return err
 			}
 		} else {
@@ -281,7 +324,7 @@ func (s *Sheet) exportRows(f *excelize.File, slice reflect.Value) error {
 	for i := 0; i < n; i++ {
 		rowNum++
 		obj := slice.Index(i)
-		if err := s.exportRow(f, obj, cellGenerator(rowNum)); err != nil {
+		if err := s.exportRow(f, obj, cellGenerator(rowNum), rowNum); err != nil {
 			return err
 		}
 	}

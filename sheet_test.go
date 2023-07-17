@@ -167,3 +167,22 @@ func TestOffset(t *testing.T) {
 	}
 	t.Fail()
 }
+
+type TestTimeObject struct {
+	Name string    `xlsx:"name" binding:"required"`
+	Sex  Sex       `xlsx:"sex" binding:"oneof=1 2"`
+	Age  int       `xlsx:"age"`
+	Time time.Time `xlsx:"time"`
+}
+
+func TestTime(t *testing.T) {
+	e := Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+	var ss []TestTimeObject
+	e.Scan(&ss)
+	for _, s := range ss {
+		fmt.Println(s.Name, s.Sex, s.Time)
+	}
+	data, _ := e.Export(&ss)
+	ioutil.WriteFile("b.xlsx", data.Bytes(), 0644)
+	t.Fail()
+}
