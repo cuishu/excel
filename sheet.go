@@ -45,12 +45,6 @@ func (s Sheet) excelizeOpen() (*excelize.File, error) {
 	return nil, errors.New("filename can not be empty")
 }
 
-func (s Sheet) timeStyle(f *excelize.File, rv reflect.Value) int {
-	fmtCode := "yyyy/mm/dd hh:mm:ss"
-	styleID, _ := f.NewStyle(&excelize.Style{CustomNumFmt: &fmtCode})
-	return styleID
-}
-
 func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	props, err := f.GetWorkbookProps()
 	if err != nil {
