@@ -2,7 +2,6 @@ package excel
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -43,7 +42,7 @@ func TestScan(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	ioutil.WriteFile("b.xlsx", buff.Bytes(), 0644)
+	os.WriteFile("b.xlsx", buff.Bytes(), 0644)
 
 	var example ExcelExample
 	if err := (Excel{Filename: "b.xlsx"}).Scan(&example); err != nil {
@@ -69,7 +68,7 @@ func TestScanFromReader(t *testing.T) {
 		t.FailNow()
 	}
 
-	ioutil.WriteFile("b.xlsx", buff.Bytes(), 0644)
+	os.WriteFile("b.xlsx", buff.Bytes(), 0644)
 	defer os.Remove("b.xlsx")
 
 	file, err := os.Open("b.xlsx")

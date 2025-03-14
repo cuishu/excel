@@ -86,7 +86,7 @@ func TestExportAndScan(t *testing.T) {
 		fmt.Println(err.Error())
 		t.FailNow()
 	}
-	ioutil.WriteFile("a.xlsx", buff.Bytes(), 0644)
+	os.WriteFile("a.xlsx", buff.Bytes(), 0644)
 	var ss []TestObject
 	e.Scan(&ss)
 	for _, s := range ss {
@@ -137,7 +137,7 @@ func TestSheetScanFromReader(t *testing.T) {
 		fmt.Println(err.Error())
 		t.FailNow()
 	}
-	ioutil.WriteFile("b.xlsx", buff.Bytes(), 0644)
+	os.WriteFile("b.xlsx", buff.Bytes(), 0644)
 	defer os.Remove("b.xlsx")
 
 	file, err := os.Open("b.xlsx")
@@ -183,6 +183,6 @@ func TestTime(t *testing.T) {
 		fmt.Println(s.Name, s.Sex, s.Time)
 	}
 	data, _ := e.Export(&ss)
-	ioutil.WriteFile("b.xlsx", data.Bytes(), 0644)
+	os.WriteFile("b.xlsx", data.Bytes(), 0644)
 	t.Fail()
 }
