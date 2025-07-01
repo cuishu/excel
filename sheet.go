@@ -155,7 +155,6 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 					}, pics)
 					rv = reflect.ValueOf(pictures)
 				}
-				fmt.Println(value)
 				o.Elem().Field(j).Set(rv)
 			} else {
 				return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
