@@ -25,6 +25,7 @@ type Sheet struct {
 	filter   Schema
 	offset   int
 	reader   io.Reader
+	style    int
 }
 
 func NewSheetFromReader(r io.Reader, sheet string) *Sheet {

@@ -14,6 +14,7 @@ type Excel struct {
 	Filename string
 	reader   io.Reader
 	offset   int
+	style    int
 }
 
 func NewExcelFromReader(r io.Reader) *Excel {
@@ -64,7 +65,7 @@ func (e Excel) Scan(v any) error {
 	return nil
 }
 
-func (e Excel) export(v any) (*excelize.File, error) {
+func (e *Excel) export(v any) (*excelize.File, error) {
 	rv := reflect.ValueOf(v)
 
 	if rv.Kind() != reflect.Ptr {
@@ -109,7 +110,7 @@ func (e Excel) ExportTo(w io.Writer, v any) error {
 	return err
 }
 
-func (e Excel) streamExport(v any) (*excelize.File, error) {
+func (e *Excel) streamExport(v any) (*excelize.File, error) {
 	rv := reflect.ValueOf(v)
 
 	if rv.Kind() != reflect.Ptr {
@@ -121,9 +122,16 @@ func (e Excel) streamExport(v any) (*excelize.File, error) {
 	}
 	rt := rv.Type()
 	f := excelize.NewFile()
+	style, err := f.NewStyle(&excelize.Style{
+		NumFmt: 49,
+	})
+	if err != nil {
+		return nil, err
+	}
+	e.style = style
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
-		sheet := &Sheet{Sheet: getFieldName(rt.Field(i))}
+		sheet := &Sheet{Sheet: getFieldName(rt.Field(i)), style: style}
 		if err := sheet.sheetStreamExport(f, rv.Field(i).Addr()); err != nil {
 			return nil, err
 		}

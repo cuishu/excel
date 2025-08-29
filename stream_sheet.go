@@ -12,7 +12,7 @@ func (s *Sheet) streamExportTitle(writer *excelize.StreamWriter, schema Schema, 
 	title := titleRow(schema, t)
 	return writer.SetRow("A1", functools.Map(func(v string) any {
 		return &excelize.Cell{
-			StyleID: 0,
+			StyleID: s.style,
 			Formula: "",
 			Value:   v,
 		}
@@ -77,7 +77,7 @@ func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value
 	}
 	if err := writer.SetRow(col(), functools.Map(func(v any) any {
 		return &excelize.Cell{
-			StyleID: 0,
+			StyleID: s.style,
 			Formula: "",
 			Value:   v,
 		}
