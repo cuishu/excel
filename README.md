@@ -147,3 +147,21 @@ func (sex *Sex) UnmarshalXLSX(data []byte) error {
 	return errors.New("invalid value")
 }
 ```
+
+## StreamExport
+`StreamExport` is faster than `Export`, but it only supports values that can be converted into strings.
+
+**Example**
+
+```go
+var humans []Human
+humans = append(Human{ID: 1, Name: "Smith"})
+humans = append(Human{ID: 2, Name: "Jack"})
+humans = append(Human{ID: 3, Name: "James"})
+
+buff, err := (&Sheet{Sheet: "Sheet1"}).StreamExport(&humans)
+
+ioutil.WriteFile("a.xlsx", buff.Bytes(), 0644)
+```
+
+`StreamExport` is useful when you have a large amount of data to export.

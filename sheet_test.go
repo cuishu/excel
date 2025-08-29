@@ -3,7 +3,6 @@ package excel
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -124,7 +123,7 @@ func TestPicWithURL(t *testing.T) {
 		t.Error(err)
 		t.FailNow()
 	}
-	ioutil.WriteFile("a.xlsx", buff.Bytes(), 0644)
+	os.WriteFile("a.xlsx", buff.Bytes(), 0644)
 	os.Remove("a.xlsx")
 }
 

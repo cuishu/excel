@@ -33,6 +33,19 @@ func TestExport(t *testing.T) {
 	}
 }
 
+func TestStreamExport(t *testing.T) {
+	example := ExcelExample{
+		Human:  []Human{{1, "Smith"}},
+		Animal: []Animal{{1, "Wolverine"}},
+	}
+	buff, err := Excel{}.StreamExport(&example)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	os.WriteFile("b.xlsx", buff.Bytes(), 0644)
+}
+
 func TestScan(t *testing.T) {
 	buff, err := Excel{}.Export(&ExcelExample{
 		Human:  []Human{{1, "Smith"}},

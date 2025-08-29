@@ -98,7 +98,7 @@ func getReflectValue(s string, t reflect.Type) (reflect.Value, error) {
 	return rv, nil
 }
 
-func toString(v interface{}) string {
+func toString(v any) string {
 	if bv, ok := v.([]byte); ok {
 		return string(bv)
 	}

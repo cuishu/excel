@@ -179,7 +179,7 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	return nil
 }
 
-func (s Sheet) Scan(v interface{}) error {
+func (s Sheet) Scan(v any) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
 		panic("param must be slice pointer")
@@ -205,15 +205,24 @@ func cellGenerator(line int) column {
 	}
 }
 
-func exportTitle(f *excelize.File, schema Schema, sheet string, t reflect.Type, col column) {
+func titleRow(schema Schema, t reflect.Type) []string {
+	var title []string
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 
 		tag := getFieldName(field)
 		show, ok := schema[tag]
 		if (len(schema) == 0) || (show && ok) {
-			f.SetCellStr(sheet, col(), tag)
+			title = append(title, tag)
 		}
+	}
+	return title
+}
+
+func exportTitle(f *excelize.File, schema Schema, sheet string, t reflect.Type, col column) {
+	title := titleRow(schema, t)
+	for _, v := range title {
+		f.SetCellStr(sheet, col(), v)
 	}
 }
 
@@ -254,7 +263,7 @@ func (s *Sheet) exportCell(f *excelize.File, field reflect.Value, col column) er
 	return nil
 }
 
-func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column, row int) error {
+func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) error {
 	if field.Type() == picReflectType {
 		return s.exportPic(f, field, col)
 	} else if field.Type() == cellReflectType {
@@ -278,12 +287,12 @@ func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column, 
 	return nil
 }
 
-func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column, row int) error {
+func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column) error {
 	t := obj.Type()
 	for i := 0; i < obj.NumField(); i++ {
 		field := obj.Field(i)
 		if field.Kind() == reflect.Struct {
-			if err := s.exportStruct(f, field, col, row); err != nil {
+			if err := s.exportStruct(f, field, col); err != nil {
 				return err
 			}
 		} else {
@@ -317,7 +326,7 @@ func (s *Sheet) exportRows(f *excelize.File, slice reflect.Value) error {
 	for i := 0; i < n; i++ {
 		rowNum++
 		obj := slice.Index(i)
-		if err := s.exportRow(f, obj, cellGenerator(rowNum), rowNum); err != nil {
+		if err := s.exportRow(f, obj, cellGenerator(rowNum)); err != nil {
 			return err
 		}
 	}
@@ -344,7 +353,7 @@ func (s *Sheet) sheetExport(f *excelize.File, rv reflect.Value) error {
 	return nil
 }
 
-func (s *Sheet) Export(v interface{}) (*bytes.Buffer, error) {
+func (s *Sheet) export(v any) (*excelize.File, error) {
 	if s.Sheet == "" {
 		s.Sheet = defaultSheet
 	}
@@ -359,7 +368,24 @@ func (s *Sheet) Export(v interface{}) (*bytes.Buffer, error) {
 	if s.Sheet != defaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
+	return f, nil
+}
+
+func (s *Sheet) Export(v any) (*bytes.Buffer, error) {
+	f, err := s.export(v)
+	if err != nil {
+		return nil, err
+	}
 	return f.WriteToBuffer()
+}
+
+func (s *Sheet) ExportTo(w io.Writer, v any) error {
+	f, err := s.export(v)
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteTo(w)
+	return err
 }
 
 func (s *Sheet) Filter(schema Schema) *Sheet {
