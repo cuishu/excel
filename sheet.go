@@ -60,7 +60,7 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	if err != nil {
 		return err
 	}
-	var schema []string
+	var schema []string = make([]string, 0, t.NumField())
 	var length int = len(rows)
 	if length <= s.offset {
 		return fmt.Errorf("file rows less than %d", s.offset+1)
@@ -68,7 +68,7 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	rows = rows[s.offset:]
 	length = len(rows)
 	array := reflect.MakeSlice(rv.Type().Elem(), length-1, length)
-	var indexArr []int
+	var indexArr []int = make([]int, 0, length)
 	n := 0
 	for i, row := range rows {
 		var obj map[string]string = make(map[string]string)
@@ -207,7 +207,7 @@ func cellGenerator(line int) column {
 }
 
 func titleRow(schema Schema, t reflect.Type) []string {
-	var title []string
+	var title []string = make([]string, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 

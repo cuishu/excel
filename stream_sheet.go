@@ -42,8 +42,8 @@ func (s *Sheet) streamExportStruct(field reflect.Value) (any, error) {
 	}
 }
 
-func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value, col column, row int) error {
-	var rowData []any
+func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value, col column) error {
+	var rowData []any = make([]any, 0, obj.NumField())
 	t := obj.Type()
 	for i := 0; i < obj.NumField(); i++ {
 		field := obj.Field(i)
@@ -90,10 +90,10 @@ func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value
 func (s *Sheet) streamExportRows(writer *excelize.StreamWriter, slice reflect.Value) error {
 	rowNum := 1
 	n := slice.Len()
-	for i := 0; i < n; i++ {
+	for i := range n {
 		rowNum++
 		obj := slice.Index(i)
-		if err := s.streamExportRow(writer, obj, cellGenerator(rowNum), rowNum); err != nil {
+		if err := s.streamExportRow(writer, obj, cellGenerator(rowNum)); err != nil {
 			return err
 		}
 	}

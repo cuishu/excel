@@ -119,7 +119,7 @@ var twentySixTable = []string{"", "A", "B", "C", "D", "E", "F", "G", "H", "I", "
 func toTwentySix(n int) string {
 	var str string
 	var k int
-	var temp []int
+	var temp []int = make([]int, 0, 3)
 	if n > 26 {
 		for {
 			k = n % 26

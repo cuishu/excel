@@ -101,3 +101,33 @@ func TestScanFromReader(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func BenchmarkExport(b *testing.B) {
+	example := ExcelExample{
+		Human:  []Human{{1, "Smith"}},
+		Animal: []Animal{{1, "Wolverine"}},
+	}
+	for i := 0; i < 10000; i++ {
+		example.Human = append(example.Human, Human{i, fmt.Sprintf("name_%d", i)})
+		example.Animal = append(example.Animal, Animal{i, fmt.Sprintf("name_%d", i)})
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Excel{}.Export(&example)
+	}
+}
+
+func BenchmarkStreamExport(b *testing.B) {
+	example := ExcelExample{
+		Human:  []Human{{1, "Smith"}},
+		Animal: []Animal{{1, "Wolverine"}},
+	}
+	for i := 0; i < 10000; i++ {
+		example.Human = append(example.Human, Human{i, fmt.Sprintf("name_%d", i)})
+		example.Animal = append(example.Animal, Animal{i, fmt.Sprintf("name_%d", i)})
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Excel{}.StreamExport(&example)
+	}
+}
