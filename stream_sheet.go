@@ -1,7 +1,9 @@
 package excel
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/cuishu/functools"
@@ -111,7 +113,6 @@ func (s *Sheet) sheetStreamExport(f *excelize.File, rv reflect.Value) error {
 	if err != nil {
 		return err
 	}
-	defer writer.Flush()
 
 	if err := s.streamExportTitle(writer, s.filter, t); err != nil {
 		return err
@@ -123,5 +124,27 @@ func (s *Sheet) sheetStreamExport(f *excelize.File, rv reflect.Value) error {
 		return err
 	}
 
-	return nil
+	return writer.Flush()
+}
+
+func (s *Sheet) StreamExport(v any) (*bytes.Buffer, error) {
+	f := excelize.NewFile()
+	defer f.Close()
+	rv := reflect.ValueOf(v)
+	if err := s.sheetStreamExport(f, rv); err != nil {
+		return nil, err
+	}
+
+	return f.WriteToBuffer()
+}
+
+func (s *Sheet) StreamExportTo(writer io.Writer, v any) error {
+	f := excelize.NewFile()
+	defer f.Close()
+	rv := reflect.ValueOf(v)
+	if err := s.sheetStreamExport(f, rv); err != nil {
+		return err
+	}
+	_, err := f.WriteTo(writer)
+	return err
 }

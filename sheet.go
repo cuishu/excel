@@ -189,6 +189,7 @@ func (s Sheet) Scan(v any) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	return s.scanSheet(f, rv)
 }
 
@@ -354,38 +355,39 @@ func (s *Sheet) sheetExport(f *excelize.File, rv reflect.Value) error {
 	return nil
 }
 
-func (s *Sheet) export(v any) (*excelize.File, error) {
+func (s *Sheet) export(f *excelize.File, v any) error {
 	if s.Sheet == "" {
 		s.Sheet = defaultSheet
 	}
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
+	if rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
 		panic("param must be slice")
 	}
-	f := excelize.NewFile()
 	if err := s.sheetExport(f, rv); err != nil {
-		return nil, err
+		return err
 	}
 	if s.Sheet != defaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
-	return f, nil
+	return nil
 }
 
 func (s *Sheet) Export(v any) (*bytes.Buffer, error) {
-	f, err := s.export(v)
-	if err != nil {
+	f := excelize.NewFile()
+	defer f.Close()
+	if err := s.export(f, v); err != nil {
 		return nil, err
 	}
 	return f.WriteToBuffer()
 }
 
 func (s *Sheet) ExportTo(w io.Writer, v any) error {
-	f, err := s.export(v)
-	if err != nil {
+	f := excelize.NewFile()
+	defer f.Close()
+	if err := s.export(f, v); err != nil {
 		return err
 	}
-	_, err = f.WriteTo(w)
+	_, err := f.WriteTo(w)
 	return err
 }
 

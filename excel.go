@@ -58,6 +58,7 @@ func (e Excel) Scan(v any) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	for i := 0; i < rt.NumField(); i++ {
 		Sheet{Sheet: getFieldName(rt.Field(i))}.Offset(e.offset).scanSheet(f, rv.Field(i).Addr())
 	}
@@ -65,23 +66,22 @@ func (e Excel) Scan(v any) error {
 	return nil
 }
 
-func (e *Excel) export(v any) (*excelize.File, error) {
+func (e *Excel) export(f *excelize.File, v any) error {
 	rv := reflect.ValueOf(v)
 
 	if rv.Kind() != reflect.Ptr {
-		return nil, errors.New("param type must be ptr")
+		return errors.New("param type must be ptr")
 	}
 	rv = rv.Elem()
 	if rv.Kind() != reflect.Struct {
-		return nil, errors.New("param type must be struct ptr")
+		return errors.New("param type must be struct ptr")
 	}
 	rt := rv.Type()
-	f := excelize.NewFile()
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
 		sheet := &Sheet{Sheet: getFieldName(rt.Field(i))}
 		if err := sheet.sheetExport(f, rv.Field(i).Addr()); err != nil {
-			return nil, err
+			return err
 		}
 		if sheet.Sheet == defaultSheet {
 			deleteDefaultSheet = false
@@ -90,50 +90,51 @@ func (e *Excel) export(v any) (*excelize.File, error) {
 	if deleteDefaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
-	return f, nil
+	return nil
 }
 
 func (e Excel) Export(v any) (*bytes.Buffer, error) {
-	f, err := e.export(v)
-	if err != nil {
+	f := excelize.NewFile()
+	defer f.Close()
+	if err := e.export(f, v); err != nil {
 		return nil, err
 	}
 	return f.WriteToBuffer()
 }
 
 func (e Excel) ExportTo(w io.Writer, v any) error {
-	f, err := e.export(v)
-	if err != nil {
+	f := excelize.NewFile()
+	defer f.Close()
+	if err := e.export(f, v); err != nil {
 		return err
 	}
-	_, err = f.WriteTo(w)
+	_, err := f.WriteTo(w)
 	return err
 }
 
-func (e *Excel) streamExport(v any) (*excelize.File, error) {
+func (e *Excel) streamExport(f *excelize.File, v any) error {
 	rv := reflect.ValueOf(v)
 
 	if rv.Kind() != reflect.Ptr {
-		return nil, errors.New("param type must be ptr")
+		return errors.New("param type must be ptr")
 	}
 	rv = rv.Elem()
 	if rv.Kind() != reflect.Struct {
-		return nil, errors.New("param type must be struct ptr")
+		return errors.New("param type must be struct ptr")
 	}
 	rt := rv.Type()
-	f := excelize.NewFile()
 	style, err := f.NewStyle(&excelize.Style{
 		NumFmt: 49,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	e.style = style
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
 		sheet := &Sheet{Sheet: getFieldName(rt.Field(i)), style: style}
 		if err := sheet.sheetStreamExport(f, rv.Field(i).Addr()); err != nil {
-			return nil, err
+			return err
 		}
 		if sheet.Sheet == defaultSheet {
 			deleteDefaultSheet = false
@@ -142,22 +143,24 @@ func (e *Excel) streamExport(v any) (*excelize.File, error) {
 	if deleteDefaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
-	return f, nil
+	return nil
 }
 
 func (e Excel) StreamExport(v any) (*bytes.Buffer, error) {
-	f, err := e.streamExport(v)
-	if err != nil {
+	f := excelize.NewFile()
+	defer f.Close()
+	if err := e.streamExport(f, v); err != nil {
 		return nil, err
 	}
 	return f.WriteToBuffer()
 }
 
 func (e Excel) StreamExportTo(w io.Writer, v any) error {
-	f, err := e.streamExport(v)
-	if err != nil {
+	f := excelize.NewFile()
+	defer f.Close()
+	if err := e.streamExport(f, v); err != nil {
 		return err
 	}
-	_, err = f.WriteTo(w)
+	_, err := f.WriteTo(w)
 	return err
 }
