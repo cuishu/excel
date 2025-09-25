@@ -376,7 +376,7 @@ func (s *Sheet) export(f *excelize.File, v any) error {
 	}
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
-		panic("param must be slice")
+		panic("param must be slice ptr")
 	}
 	if err := s.sheetExport(f, rv); err != nil {
 		return err
