@@ -13,6 +13,9 @@ import (
 func (s *Sheet) streamExportTitle(writer *excelize.StreamWriter, schema Schema, t reflect.Type) error {
 	title := titleRow(schema, t)
 	s.colCnt = len(title)
+	if s.useTextStyle {
+		writer.SetColStyle(1, s.colCnt, s.style)
+	}
 	return writer.SetRow("A1", functools.Map(func(v string) any {
 		return &excelize.Cell{
 			StyleID: s.style,
@@ -125,9 +128,6 @@ func (s *Sheet) sheetStreamExport(f *excelize.File, rv reflect.Value) error {
 	if err := s.streamExportRows(writer, slice); err != nil {
 		return err
 	}
-	offset := 1 + s.offset + s.rowCnt
-	n := s.appendRowsCnt + offset
-	f.SetRowStyle(s.Sheet, offset, n, s.style)
 	return writer.Flush()
 }
 

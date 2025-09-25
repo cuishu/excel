@@ -79,7 +79,7 @@ type TestObject struct {
 
 func TestExportAndScan(t *testing.T) {
 	e := &Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
-	e.AppendEmptyRows(10)
+	e.UseTextStyle()
 	buff, err := e.Export(&[]TestObject{
 		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", nil), Cell{}},
 	})
