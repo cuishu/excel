@@ -22,9 +22,10 @@ const (
 type Sex int
 
 func (sex Sex) MarshalXLSX() ([]byte, error) {
-	if sex == Male {
+	switch sex {
+	case Male:
 		return []byte("男"), nil
-	} else if sex == Female {
+	case Female:
 		return []byte("女"), nil
 	}
 	return nil, errors.New("性别错误")
@@ -78,6 +79,7 @@ type TestObject struct {
 
 func TestExportAndScan(t *testing.T) {
 	e := &Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+	e.AppendEmptyRows(10)
 	buff, err := e.Export(&[]TestObject{
 		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", nil), Cell{}},
 	})

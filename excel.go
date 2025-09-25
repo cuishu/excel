@@ -11,14 +11,19 @@ import (
 )
 
 type Excel struct {
-	Filename string
-	reader   io.Reader
-	offset   int
-	style    int
+	Filename      string
+	reader        io.Reader
+	offset        int
+	style         int
+	appendRowsCnt int
 }
 
 func NewExcelFromReader(r io.Reader) *Excel {
 	return &Excel{reader: r}
+}
+
+func (e *Excel) AppendEmptyRows(n int) {
+	e.appendRowsCnt = n
 }
 
 func (e *Excel) Offset(n int) *Excel {
@@ -80,6 +85,7 @@ func (e *Excel) export(f *excelize.File, v any) error {
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
 		sheet := &Sheet{Sheet: getFieldName(rt.Field(i))}
+		sheet.AppendEmptyRows(e.appendRowsCnt)
 		if err := sheet.sheetExport(f, rv.Field(i).Addr()); err != nil {
 			return err
 		}
@@ -133,6 +139,7 @@ func (e *Excel) streamExport(f *excelize.File, v any) error {
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
 		sheet := &Sheet{Sheet: getFieldName(rt.Field(i)), style: style}
+		sheet.AppendEmptyRows(e.appendRowsCnt)
 		if err := sheet.sheetStreamExport(f, rv.Field(i).Addr()); err != nil {
 			return err
 		}

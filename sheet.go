@@ -20,16 +20,23 @@ const defaultSheet = "Sheet1"
 type Schema map[string]bool
 
 type Sheet struct {
-	Filename string
-	Sheet    string
-	filter   Schema
-	offset   int
-	reader   io.Reader
-	style    int
+	Filename      string
+	Sheet         string
+	filter        Schema
+	offset        int
+	reader        io.Reader
+	style         int
+	appendRowsCnt int
+	rowCnt        int
+	colCnt        int
 }
 
 func NewSheetFromReader(r io.Reader, sheet string) *Sheet {
 	return &Sheet{Sheet: sheet, reader: r}
+}
+
+func (s *Sheet) AppendEmptyRows(n int) {
+	s.appendRowsCnt = n
 }
 
 func (s Sheet) Offset(n int) Sheet {
@@ -221,10 +228,13 @@ func titleRow(schema Schema, t reflect.Type) []string {
 	return title
 }
 
-func exportTitle(f *excelize.File, schema Schema, sheet string, t reflect.Type, col column) {
+func (s *Sheet) exportTitle(f *excelize.File, schema Schema, sheet string, t reflect.Type, col column) {
 	title := titleRow(schema, t)
+	s.colCnt = len(title)
 	for _, v := range title {
-		f.SetCellStr(sheet, col(), v)
+		colIdx := col()
+		f.SetCellStyle(sheet, colIdx, colIdx, s.style)
+		f.SetCellStr(sheet, colIdx, v)
 	}
 }
 
@@ -311,11 +321,15 @@ func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column) error
 							}
 							return err
 						}
-						f.SetCellStr(s.Sheet, col(), toString(res[0].Interface()))
+						colIdx := col()
+						f.SetCellStyle(s.Sheet, colIdx, colIdx, s.style)
+						f.SetCellStr(s.Sheet, colIdx, toString(res[0].Interface()))
 						continue
 					}
 				}
-				f.SetCellStr(s.Sheet, col(), toString(field.Interface()))
+				colIdx := col()
+				f.SetCellStyle(s.Sheet, colIdx, colIdx, s.style)
+				f.SetCellStr(s.Sheet, colIdx, toString(field.Interface()))
 			}
 		}
 	}
@@ -332,6 +346,7 @@ func (s *Sheet) exportRows(f *excelize.File, slice reflect.Value) error {
 			return err
 		}
 	}
+	s.rowCnt = n
 	return nil
 }
 
@@ -344,7 +359,7 @@ func (s *Sheet) sheetExport(f *excelize.File, rv reflect.Value) error {
 	}
 	f.SetActiveSheet(sheet)
 
-	exportTitle(f, s.filter, s.Sheet, t, cellGenerator(1))
+	s.exportTitle(f, s.filter, s.Sheet, t, cellGenerator(1))
 
 	slice := rv.Elem()
 
@@ -366,6 +381,10 @@ func (s *Sheet) export(f *excelize.File, v any) error {
 	if err := s.sheetExport(f, rv); err != nil {
 		return err
 	}
+	offset := 1 + s.offset + s.rowCnt
+	n := s.appendRowsCnt + offset
+	f.SetRowStyle(s.Sheet, offset, n, s.style)
+	fmt.Println(offset, n)
 	if s.Sheet != defaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
@@ -375,6 +394,13 @@ func (s *Sheet) export(f *excelize.File, v any) error {
 func (s *Sheet) Export(v any) (*bytes.Buffer, error) {
 	f := excelize.NewFile()
 	defer f.Close()
+	style, err := f.NewStyle(&excelize.Style{
+		NumFmt: 49,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.style = style
 	if err := s.export(f, v); err != nil {
 		return nil, err
 	}
@@ -384,10 +410,17 @@ func (s *Sheet) Export(v any) (*bytes.Buffer, error) {
 func (s *Sheet) ExportTo(w io.Writer, v any) error {
 	f := excelize.NewFile()
 	defer f.Close()
+	style, err := f.NewStyle(&excelize.Style{
+		NumFmt: 49,
+	})
+	if err != nil {
+		return err
+	}
+	s.style = style
 	if err := s.export(f, v); err != nil {
 		return err
 	}
-	_, err := f.WriteTo(w)
+	_, err = f.WriteTo(w)
 	return err
 }
 
