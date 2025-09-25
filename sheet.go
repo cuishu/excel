@@ -58,8 +58,10 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	if err != nil {
 		return err
 	}
-
-	date1904 := *props.Date1904
+	var date1904 bool
+	if props.Date1904 != nil {
+		date1904 = *props.Date1904
+	}
 
 	t := rv.Type().Elem().Elem()
 
