@@ -384,7 +384,6 @@ func (s *Sheet) export(f *excelize.File, v any) error {
 	offset := 1 + s.offset + s.rowCnt
 	n := s.appendRowsCnt + offset
 	f.SetRowStyle(s.Sheet, offset, n, s.style)
-	fmt.Println(offset, n)
 	if s.Sheet != defaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
