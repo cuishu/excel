@@ -58,7 +58,7 @@ func TestScan(t *testing.T) {
 	os.WriteFile("b.xlsx", buff.Bytes(), 0644)
 
 	var example ExcelExample
-	if err := (Excel{Filename: "b.xlsx"}).Scan(&example); err != nil {
+	if err := (Excel{filename: "b.xlsx"}).Scan(&example); err != nil {
 		t.Error(err)
 		t.FailNow()
 	}

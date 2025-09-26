@@ -11,11 +11,15 @@ import (
 )
 
 type Excel struct {
-	Filename     string
+	filename     string
 	reader       io.Reader
 	offset       int
 	style        int
 	useTextStyle bool
+}
+
+func NewExcel(filename string) *Excel {
+	return &Excel{filename: filename}
 }
 
 func NewExcelFromReader(r io.Reader) *Excel {
@@ -41,8 +45,8 @@ func getFieldName(field reflect.StructField) string {
 }
 
 func (e Excel) excelizeOpen() (*excelize.File, error) {
-	if e.Filename != "" {
-		return excelize.OpenFile(e.Filename)
+	if e.filename != "" {
+		return excelize.OpenFile(e.filename)
 	} else if e.reader != nil {
 		return excelize.OpenReader(e.reader)
 	}
@@ -66,7 +70,7 @@ func (e Excel) Scan(v any) error {
 	}
 	defer f.Close()
 	for i := 0; i < rt.NumField(); i++ {
-		Sheet{Sheet: getFieldName(rt.Field(i))}.Offset(e.offset).scanSheet(f, rv.Field(i).Addr())
+		NewSheet(getFieldName(rt.Field(i))).Offset(e.offset).scanSheet(f, rv.Field(i).Addr())
 	}
 
 	return nil
@@ -85,14 +89,14 @@ func (e *Excel) export(f *excelize.File, v any) error {
 	rt := rv.Type()
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
-		sheet := &Sheet{Sheet: getFieldName(rt.Field(i))}
+		sheet := &Sheet{sheet: getFieldName(rt.Field(i))}
 		if e.useTextStyle {
 			sheet.UseTextStyle()
 		}
 		if err := sheet.sheetExport(f, rv.Field(i).Addr()); err != nil {
 			return err
 		}
-		if sheet.Sheet == defaultSheet {
+		if sheet.sheet == defaultSheet {
 			deleteDefaultSheet = false
 		}
 	}
@@ -141,14 +145,14 @@ func (e *Excel) streamExport(f *excelize.File, v any) error {
 	e.style = style
 	deleteDefaultSheet := true
 	for i := 0; i < rt.NumField(); i++ {
-		sheet := &Sheet{Sheet: getFieldName(rt.Field(i)), style: style}
+		sheet := &Sheet{sheet: getFieldName(rt.Field(i)), style: style}
 		if e.useTextStyle {
 			sheet.UseTextStyle()
 		}
 		if err := sheet.sheetStreamExport(f, rv.Field(i).Addr()); err != nil {
 			return err
 		}
-		if sheet.Sheet == defaultSheet {
+		if sheet.sheet == defaultSheet {
 			deleteDefaultSheet = false
 		}
 	}

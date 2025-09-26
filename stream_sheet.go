@@ -109,12 +109,12 @@ func (s *Sheet) streamExportRows(writer *excelize.StreamWriter, slice reflect.Va
 
 func (s *Sheet) sheetStreamExport(f *excelize.File, rv reflect.Value) error {
 	t := rv.Type().Elem().Elem()
-	index, err := f.NewSheet(s.Sheet)
+	index, err := f.NewSheet(s.sheet)
 	if err != nil {
 		return err
 	}
 	f.SetActiveSheet(index)
-	writer, err := f.NewStreamWriter(s.Sheet)
+	writer, err := f.NewStreamWriter(s.sheet)
 	if err != nil {
 		return err
 	}

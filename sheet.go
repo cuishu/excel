@@ -19,9 +19,25 @@ const defaultSheet = "Sheet1"
 
 type Schema map[string]bool
 
+type Row struct {
+	ID   int
+	Data []string
+}
+
+type Error struct {
+	Row  Row
+	mesg string
+}
+
+func (e Error) Error() string {
+	return e.mesg
+}
+
 type Sheet struct {
-	Filename     string
-	Sheet        string
+	filename     string
+	sheet        string
+	title        []string
+	errors       []Error
 	filter       Schema
 	offset       int
 	reader       io.Reader
@@ -31,29 +47,42 @@ type Sheet struct {
 	useTextStyle bool
 }
 
+func NewSheet(sheet string) *Sheet {
+	return &Sheet{sheet: sheet}
+}
+
+func NewSheetFromFile(filename, sheet string) *Sheet {
+	return &Sheet{sheet: sheet, filename: filename}
+}
+
 func NewSheetFromReader(r io.Reader, sheet string) *Sheet {
-	return &Sheet{Sheet: sheet, reader: r}
+	return &Sheet{sheet: sheet, reader: r}
 }
 
-func (s *Sheet) UseTextStyle() {
+func (s *Sheet) UseTextStyle() *Sheet {
 	s.useTextStyle = true
+	return s
 }
 
-func (s Sheet) Offset(n int) Sheet {
+func (s *Sheet) Offset(n int) *Sheet {
 	s.offset = n
 	return s
 }
 
-func (s Sheet) excelizeOpen() (*excelize.File, error) {
-	if s.Filename != "" {
-		return excelize.OpenFile(s.Filename)
+func (s *Sheet) Errors() []Error {
+	return s.errors
+}
+
+func (s *Sheet) excelizeOpen() (*excelize.File, error) {
+	if s.filename != "" {
+		return excelize.OpenFile(s.filename)
 	} else if s.reader != nil {
 		return excelize.OpenReader(s.reader)
 	}
 	return nil, errors.New("filename can not be empty")
 }
 
-func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
+func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	props, err := f.GetWorkbookProps()
 	if err != nil {
 		return err
@@ -65,7 +94,7 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 
 	t := rv.Type().Elem().Elem()
 
-	rows, err := f.GetRows(s.Sheet)
+	rows, err := f.GetRows(s.sheet)
 	if err != nil {
 		return err
 	}
@@ -116,7 +145,8 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 					if len(values) > 0 {
 						err := values[0].Interface()
 						if err != nil {
-							return fmt.Errorf("line %d => %s: %s", i, err.(error).Error(), value)
+							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.(error).Error(), value)})
+							continue
 						}
 					}
 					goto validate
@@ -129,20 +159,24 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 						if elem == value {
 							cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
 							if err != nil {
-								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								continue
 							}
 							// f.SetCellStyle(s.Sheet, cellName, cellName, styleID)
-							value, err := f.GetCellValue(s.Sheet, cellName, excelize.Options{RawCellValue: true})
+							value, err := f.GetCellValue(s.sheet, cellName, excelize.Options{RawCellValue: true})
 							if err != nil {
-								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								continue
 							}
 							v, err := strconv.ParseFloat(value, 64)
 							if err != nil {
-								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								continue
 							}
 							t, err := excelize.ExcelDateToTime(v, date1904)
 							if err != nil {
-								return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								continue
 							}
 							o.Elem().Field(j).Set(reflect.ValueOf(t))
 						}
@@ -152,9 +186,10 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				if fieldType.Elem() == picReflectType {
 					var pictures []Picture
 					var err error
-					pics, err := f.GetPictures(s.Sheet, cell(i+1, j))
+					pics, err := f.GetPictures(s.sheet, cell(i+1, j))
 					if err != nil {
-						return err
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: err.Error()})
+						continue
 					}
 					pictures = functools.Map(func(pic excelize.Picture) Picture {
 						return Picture{
@@ -167,13 +202,15 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				}
 				o.Elem().Field(j).Set(rv)
 			} else {
-				return fmt.Errorf("line %d => %s: %s", i, err.Error(), value)
+				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+				continue
 			}
 		validate:
 			if valid != "" {
 				if o.Elem().Field(j).Interface() != nil {
 					if err := validate.Var(o.Elem().Field(j).Interface(), valid); err != nil {
-						return fmt.Errorf("line %d => %s: %v %s", i, tag, o.Elem().Field(j).Interface(), err.Error())
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %v %s", tag, o.Elem().Field(j).Interface(), err.Error())})
+						continue
 					}
 				}
 			}
@@ -185,11 +222,13 @@ func (s Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 		items.Index(i).Set(array.Index(index))
 	}
 	rv.Elem().Set(items)
-
+	if len(s.errors) > 0 {
+		return s.errors[0]
+	}
 	return nil
 }
 
-func (s Sheet) Scan(v any) error {
+func (s *Sheet) Scan(v any) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
 		panic("param must be slice pointer")
@@ -232,6 +271,7 @@ func titleRow(schema Schema, t reflect.Type) []string {
 
 func (s *Sheet) exportTitle(f *excelize.File, schema Schema, sheet string, t reflect.Type, col column) {
 	title := titleRow(schema, t)
+	s.title = title
 	s.colCnt = len(title)
 	if s.useTextStyle {
 		f.SetColStyle(sheet, "A:"+toTwentySix(s.colCnt), s.style)
@@ -244,11 +284,11 @@ func (s *Sheet) exportTitle(f *excelize.File, schema Schema, sheet string, t ref
 func (s *Sheet) exportPic(f *excelize.File, field reflect.Value, col column) error {
 	pic := field.Interface().(Picture)
 	if pic.withPath {
-		if err := f.AddPicture(s.Sheet, col(), pic.Name, (*excelize.GraphicOptions)(pic.Format)); err != nil {
+		if err := f.AddPicture(s.sheet, col(), pic.Name, (*excelize.GraphicOptions)(pic.Format)); err != nil {
 			return err
 		}
 	} else {
-		if err := f.AddPictureFromBytes(s.Sheet, col(),
+		if err := f.AddPictureFromBytes(s.sheet, col(),
 			&excelize.Picture{
 				File:   pic.File,
 				Format: (*excelize.GraphicOptions)(pic.Format),
@@ -263,14 +303,14 @@ func (s *Sheet) exportCell(f *excelize.File, field reflect.Value, col column) er
 	c := field.Interface().(Cell)
 	if c.HyperLink.Link != "" {
 		column := col()
-		f.SetCellStr(s.Sheet, column, c.Value)
-		f.SetCellHyperLink(s.Sheet, column, c.HyperLink.Link, string(c.HyperLink.Type))
+		f.SetCellStr(s.sheet, column, c.Value)
+		f.SetCellHyperLink(s.sheet, column, c.HyperLink.Link, string(c.HyperLink.Type))
 		if c.Style != nil {
 			style, err := f.NewStyle(c.Style)
 			if err != nil {
 				return err
 			}
-			if err := f.SetCellStyle(s.Sheet, column, column, style); err != nil {
+			if err := f.SetCellStyle(s.sheet, column, column, style); err != nil {
 				return err
 			}
 		}
@@ -293,9 +333,9 @@ func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) 
 			}
 			return err
 		}
-		f.SetCellStr(s.Sheet, col(), toString(res[0].Interface()))
+		f.SetCellStr(s.sheet, col(), toString(res[0].Interface()))
 	} else if isTime(field.Type()) {
-		f.SetCellValue(s.Sheet, col(), field.Interface())
+		f.SetCellValue(s.sheet, col(), field.Interface())
 	} else {
 		panic("struct type must implement MarshalXLSX")
 	}
@@ -325,12 +365,12 @@ func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column) error
 							return err
 						}
 						colIdx := col()
-						f.SetCellStr(s.Sheet, colIdx, toString(res[0].Interface()))
+						f.SetCellStr(s.sheet, colIdx, toString(res[0].Interface()))
 						continue
 					}
 				}
 				colIdx := col()
-				f.SetCellStr(s.Sheet, colIdx, toString(field.Interface()))
+				f.SetCellStr(s.sheet, colIdx, toString(field.Interface()))
 			}
 		}
 	}
@@ -354,13 +394,13 @@ func (s *Sheet) exportRows(f *excelize.File, slice reflect.Value) error {
 func (s *Sheet) sheetExport(f *excelize.File, rv reflect.Value) error {
 	t := rv.Type().Elem().Elem()
 
-	sheet, err := f.NewSheet(s.Sheet)
+	sheet, err := f.NewSheet(s.sheet)
 	if err != nil {
 		return err
 	}
 	f.SetActiveSheet(sheet)
 
-	s.exportTitle(f, s.filter, s.Sheet, t, cellGenerator(1))
+	s.exportTitle(f, s.filter, s.sheet, t, cellGenerator(1))
 
 	slice := rv.Elem()
 
@@ -372,8 +412,8 @@ func (s *Sheet) sheetExport(f *excelize.File, rv reflect.Value) error {
 }
 
 func (s *Sheet) export(f *excelize.File, v any) error {
-	if s.Sheet == "" {
-		s.Sheet = defaultSheet
+	if s.sheet == "" {
+		s.sheet = defaultSheet
 	}
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Type().Elem().Kind() != reflect.Slice {
@@ -382,7 +422,7 @@ func (s *Sheet) export(f *excelize.File, v any) error {
 	if err := s.sheetExport(f, rv); err != nil {
 		return err
 	}
-	if s.Sheet != defaultSheet {
+	if s.sheet != defaultSheet {
 		f.DeleteSheet(defaultSheet)
 	}
 	return nil

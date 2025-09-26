@@ -78,7 +78,7 @@ type TestObject struct {
 }
 
 func TestExportAndScan(t *testing.T) {
-	e := &Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+	e := &Sheet{filename: "a.xlsx", sheet: "Sheet3"}
 	e.UseTextStyle()
 	buff, err := e.Export(&[]TestObject{
 		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", nil), Cell{}},
@@ -120,7 +120,7 @@ func TestPicWithURL(t *testing.T) {
 			Link: "excel.go",
 			Type: Location,
 		}}}
-	buff, err := (&Sheet{Sheet: "Sheet1"}).Export(&objs)
+	buff, err := (&Sheet{sheet: "Sheet1"}).Export(&objs)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -130,7 +130,7 @@ func TestPicWithURL(t *testing.T) {
 }
 
 func TestSheetScanFromReader(t *testing.T) {
-	e := &Sheet{Sheet: "Sheet3"}
+	e := &Sheet{sheet: "Sheet3"}
 	buff, err := e.Export(&[]TestObject{
 		{"Smith", Male, 10, Time{time.Now()}, NewPicture("a.png", nil), Cell{}},
 	})
@@ -147,20 +147,20 @@ func TestSheetScanFromReader(t *testing.T) {
 	}
 	defer file.Close()
 	var data []TestObject
-	xlsx := NewSheetFromReader(file, e.Sheet)
+	xlsx := NewSheetFromReader(file, e.sheet)
 	if err = xlsx.Scan(&data); err != nil {
 		t.FailNow()
 	}
 	fmt.Println(data)
 
-	xlsx = NewSheetFromReader(nil, e.Sheet)
+	xlsx = NewSheetFromReader(nil, e.sheet)
 	if err = xlsx.Scan(&data); err == nil {
 		t.FailNow()
 	}
 }
 
 func TestOffset(t *testing.T) {
-	e := Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+	e := Sheet{filename: "a.xlsx", sheet: "Sheet3"}
 	var ss []TestObject
 	e.Offset(1).Scan(&ss)
 	for _, s := range ss {
@@ -177,7 +177,7 @@ type TestTimeObject struct {
 }
 
 func TestTime(t *testing.T) {
-	e := Sheet{Filename: "a.xlsx", Sheet: "Sheet3"}
+	e := Sheet{filename: "a.xlsx", sheet: "Sheet3"}
 	var ss []TestTimeObject
 	e.Scan(&ss)
 	for _, s := range ss {
