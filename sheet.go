@@ -123,7 +123,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 		}
 		for j, cell := range row {
 			value := strings.TrimSpace(cell)
-			if value == "" || j >= len(schema) {
+			if j >= len(schema) {
 				continue
 			}
 			obj[schema[j]] = value
@@ -218,9 +218,10 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 			}
 		validate:
 			if valid != "" {
-				if o.Elem().Field(j).Interface() != nil {
-					if err := validate.Var(o.Elem().Field(j).Interface(), valid); err != nil {
-						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %v %s", tag, o.Elem().Field(j).Interface(), err.Error())})
+				value := o.Elem().Field(j).Interface()
+				if value != nil {
+					if err := validate.Var(value, valid); err != nil {
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %v %s", tag, value, err.Error())})
 						continue
 					}
 				}
