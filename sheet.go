@@ -21,7 +21,14 @@ type Schema map[string]bool
 
 type Row struct {
 	ID   int
-	Data []string
+	Data map[string]string
+}
+
+func (row Row) Get(key string) string {
+	if v, ok := row.Data[key]; ok {
+		return v
+	}
+	return ""
 }
 
 type Error struct {
@@ -145,7 +152,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 					if len(values) > 0 {
 						err := values[0].Interface()
 						if err != nil {
-							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.(error).Error(), value)})
+							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.(error).Error(), value)})
 							continue
 						}
 					}
@@ -159,23 +166,23 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 						if elem == value {
 							cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
 								continue
 							}
 							// f.SetCellStyle(s.Sheet, cellName, cellName, styleID)
 							value, err := f.GetCellValue(s.sheet, cellName, excelize.Options{RawCellValue: true})
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
 								continue
 							}
 							v, err := strconv.ParseFloat(value, 64)
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
 								continue
 							}
 							t, err := excelize.ExcelDateToTime(v, date1904)
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
 								continue
 							}
 							o.Elem().Field(j).Set(reflect.ValueOf(t))
@@ -188,7 +195,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 					var err error
 					pics, err := f.GetPictures(s.sheet, cell(i+1, j))
 					if err != nil {
-						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: err.Error()})
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: err.Error()})
 						continue
 					}
 					pictures = functools.Map(func(pic excelize.Picture) Picture {
@@ -202,14 +209,14 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				}
 				o.Elem().Field(j).Set(rv)
 			} else {
-				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
 				continue
 			}
 		validate:
 			if valid != "" {
 				if o.Elem().Field(j).Interface() != nil {
 					if err := validate.Var(o.Elem().Field(j).Interface(), valid); err != nil {
-						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: row}, mesg: fmt.Sprintf("%s: %v %s", tag, o.Elem().Field(j).Interface(), err.Error())})
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %v %s", tag, o.Elem().Field(j).Interface(), err.Error())})
 						continue
 					}
 				}
