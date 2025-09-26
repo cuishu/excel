@@ -31,7 +31,11 @@ func (s *Sheet) streamExportStruct(field reflect.Value) (any, error) {
 	} else if field.Type() == cellReflectType {
 		panic("cell type not support")
 	}
-	if fun, ok := field.Type().MethodByName("MarshalXLSX"); ok {
+	fun, ok := field.Type().MethodByName("MarshalXLSX")
+	if !ok {
+		fun, ok = field.Type().MethodByName("MarshalText")
+	}
+	if ok {
 		res := fun.Func.Call([]reflect.Value{field})
 		if res[1].Interface() != nil {
 			err, ok := res[1].Interface().(error)
@@ -44,7 +48,7 @@ func (s *Sheet) streamExportStruct(field reflect.Value) (any, error) {
 	} else if isTime(field.Type()) {
 		return field.Interface(), nil
 	} else {
-		panic("struct type must implement MarshalXLSX")
+		panic("struct type must implement MarshalXLSX or MarshalText")
 	}
 }
 
@@ -64,7 +68,11 @@ func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value
 			show, ok := s.filter[tag]
 			if (len(s.filter) == 0) || (show && ok) {
 				if field.NumMethod() > 0 {
-					if fun, ok := field.Type().MethodByName("MarshalXLSX"); ok {
+					fun, ok := field.Type().MethodByName("MarshalXLSX")
+					if !ok {
+						fun, ok = field.Type().MethodByName("MarshalText")
+					}
+					if ok {
 						res := fun.Func.Call([]reflect.Value{field})
 						if res[1].Interface() != nil {
 							err, ok := res[1].Interface().(error)

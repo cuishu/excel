@@ -145,7 +145,11 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				continue
 			}
 			if fieldType.NumMethod() > 0 {
-				if f, ok := fieldType.MethodByName("UnmarshalXLSX"); ok {
+				f, ok := fieldType.MethodByName("UnmarshalXLSX")
+				if !ok {
+					f, ok = fieldType.MethodByName("UnmarshalText")
+				}
+				if ok {
 					in := reflect.New(f.Type.In(1)).Elem()
 					in.SetBytes([]byte(value))
 					values := f.Func.Call([]reflect.Value{fieldValue, in})
@@ -331,7 +335,11 @@ func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) 
 	} else if field.Type() == cellReflectType {
 		return s.exportCell(f, field, col)
 	}
-	if fun, ok := field.Type().MethodByName("MarshalXLSX"); ok {
+	fun, ok := field.Type().MethodByName("MarshalXLSX")
+	if !ok {
+		fun, ok = field.Type().MethodByName("MarshalText")
+	}
+	if ok {
 		res := fun.Func.Call([]reflect.Value{field})
 		if res[1].Interface() != nil {
 			err, ok := res[1].Interface().(error)
@@ -344,7 +352,7 @@ func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) 
 	} else if isTime(field.Type()) {
 		f.SetCellValue(s.sheet, col(), field.Interface())
 	} else {
-		panic("struct type must implement MarshalXLSX")
+		panic("struct type must implement MarshalXLSX or MarshalText")
 	}
 	return nil
 }
@@ -362,7 +370,11 @@ func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column) error
 			show, ok := s.filter[tag]
 			if (len(s.filter) == 0) || (show && ok) {
 				if field.NumMethod() > 0 {
-					if fun, ok := field.Type().MethodByName("MarshalXLSX"); ok {
+					fun, ok := field.Type().MethodByName("MarshalXLSX")
+					if !ok {
+						fun, ok = field.Type().MethodByName("MarshalText")
+					}
+					if ok {
 						res := fun.Func.Call([]reflect.Value{field})
 						if res[1].Interface() != nil {
 							err, ok := res[1].Interface().(error)

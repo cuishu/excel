@@ -1,6 +1,6 @@
 module github.com/cuishu/excel
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/cuishu/functools v0.0.0-20241104055922-0b95feff2de6
