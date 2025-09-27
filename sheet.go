@@ -41,17 +41,18 @@ func (e Error) Error() string {
 }
 
 type Sheet struct {
-	filename     string
-	sheet        string
-	title        []string
-	errors       []Error
-	filter       Schema
-	offset       int
-	reader       io.Reader
-	style        int
-	rowCnt       int
-	colCnt       int
-	useTextStyle bool
+	filename      string
+	sheet         string
+	title         []string
+	errors        []Error
+	filter        Schema
+	offset        int
+	reader        io.Reader
+	style         int
+	rowCnt        int
+	colCnt        int
+	useTextStyle  bool
+	collectErrors bool
 }
 
 func NewSheet(sheet string) *Sheet {
@@ -68,6 +69,11 @@ func NewSheetFromReader(r io.Reader, sheet string) *Sheet {
 
 func (s *Sheet) UseTextStyle() *Sheet {
 	s.useTextStyle = true
+	return s
+}
+
+func (s *Sheet) CollectErrors() *Sheet {
+	s.collectErrors = true
 	return s
 }
 
@@ -135,6 +141,9 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 		n++
 		o := reflect.New(t)
 		for j := 0; j < t.NumField(); j++ {
+			if !s.collectErrors && len(s.errors) > 0 {
+				return s.errors[0]
+			}
 			tag := getFieldName(t.Field(j))
 			valid := t.Field(j).Tag.Get("validate")
 			field := o.Elem().Field(j).Addr().Interface()
