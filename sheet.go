@@ -165,7 +165,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 					if len(values) > 0 {
 						err := values[0].Interface()
 						if err != nil {
-							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.(error).Error(), value)})
+							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.(error).Error())})
 							continue
 						}
 					}
@@ -179,23 +179,23 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 						if elem == value {
 							cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 								continue
 							}
 							// f.SetCellStyle(s.Sheet, cellName, cellName, styleID)
 							value, err := f.GetCellValue(s.sheet, cellName, excelize.Options{RawCellValue: true})
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 								continue
 							}
 							v, err := strconv.ParseFloat(value, 64)
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 								continue
 							}
 							t, err := excelize.ExcelDateToTime(v, date1904)
 							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 								continue
 							}
 							o.Elem().Field(j).Set(reflect.ValueOf(t))
@@ -222,7 +222,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				}
 				o.Elem().Field(j).Set(rv)
 			} else {
-				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", err.Error(), value)})
+				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 				continue
 			}
 		validate:
@@ -230,7 +230,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				value := o.Elem().Field(j).Interface()
 				if value != nil {
 					if err := validate.Var(value, valid); err != nil {
-						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %v %s", tag, value, err.Error())})
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 						continue
 					}
 				}
