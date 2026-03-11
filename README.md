@@ -47,7 +47,7 @@ Assume an Excel file `a.xlsx` with a sheet named `Sheet1`:
 var humans []Human
 
 // From file
-err := excel.Sheet{Filename: "a.xlsx", Sheet: "Sheet1"}.Scan(&humans)
+err := excel.NewSheetFromFile("a.xlsx", "Sheet1").Scan(&humans)
 if err != nil {
     // handle error
 }
@@ -70,7 +70,7 @@ humans := []Human{
     {ID: 3, Name: "James"},
 }
 
-buff, err := (&excel.Sheet{Sheet: "Sheet1"}).Export(&humans)
+buff, err := excel.NewSheet("Sheet1").Export(&humans)
 if err != nil {
     // handle error
 }
@@ -104,7 +104,7 @@ type Data struct {
 var data Data
 
 // From file
-err := excel.Excel{Filename: "b.xlsx"}.Scan(&data)
+err := excel.NewExcel(Filename: "b.xlsx").Scan(&data)
 
 // From io.Reader
 err = excel.NewExcelFromReader(reader).Scan(&data)
@@ -133,7 +133,7 @@ If the column headers are not on the first row, use `Offset(n)` to skip rows:
 
 ```go
 var items []MyStruct
-err := excel.Sheet{Filename: "data.xlsx", Sheet: "Sheet1"}.
+err := excel.NewSheetFromFile("data.xlsx", "Sheet1").
     Offset(2). // skip first two rows
     Scan(&items)
 ```
@@ -190,7 +190,7 @@ type Person struct {
 ```go
 bigData := make([]Human, 1000000) // large slice
 
-buff, err := (&excel.Sheet{Sheet: "Sheet1"}).StreamExport(&bigData)
+buff, err := excel.NewSheet("Sheet1").StreamExport(&bigData)
 if err != nil {
     // handle error
 }

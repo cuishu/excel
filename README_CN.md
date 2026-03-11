@@ -45,7 +45,7 @@ type Human struct {
 var humans []Human
 
 // 从文件读取
-err := excel.Sheet{Filename: "a.xlsx", Sheet: "Sheet1"}.Scan(&humans)
+err := excel.NewSheetFromFile("a.xlsx", "Sheet1").Scan(&humans)
 if err != nil {
     // 处理错误
 }
@@ -68,7 +68,7 @@ humans := []Human{
     {ID: 3, Name: "James"},
 }
 
-buff, err := (&excel.Sheet{Sheet: "Sheet1"}).Export(&humans)
+buff, err := excel.NewSheet("Sheet1").Export(&humans)
 if err != nil {
     // 处理错误
 }
@@ -102,7 +102,7 @@ type Data struct {
 var data Data
 
 // 从文件读取
-err := excel.Excel{Filename: "b.xlsx"}.Scan(&data)
+err := excel.NewExcel(Filename: "b.xlsx").Scan(&data)
 
 // 从 io.Reader 读取
 err = excel.NewExcelFromReader(reader).Scan(&data)
@@ -131,7 +131,7 @@ ioutil.WriteFile("b.xlsx", buff.Bytes(), 0644)
 
 ```go
 var items []MyStruct
-err := excel.Sheet{Filename: "data.xlsx", Sheet: "Sheet1"}.
+err := excel.NewSheetFromFile("data.xlsx", "Sheet1").
     Offset(2). // 跳过前两行
     Scan(&items)
 ```
@@ -188,7 +188,7 @@ type Person struct {
 ```go
 bigData := make([]Human, 1000000) // 大量数据
 
-buff, err := (&excel.Sheet{Sheet: "Sheet1"}).StreamExport(&bigData)
+buff, err := excel.NewSheet("Sheet1").StreamExport(&bigData)
 if err != nil {
     // 处理错误
 }
