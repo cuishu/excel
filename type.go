@@ -116,7 +116,7 @@ func parseFloat64(s string) (reflect.Value, error) {
 	return reflect.ValueOf(float64(v)), nil
 }
 
-func ParseBool(s string) (reflect.Value, error) {
+func parseBool(s string) (reflect.Value, error) {
 	var rv reflect.Value
 	v, err := strconv.ParseBool(s)
 	if err != nil {
@@ -155,7 +155,7 @@ func getReflectValue(s string, t reflect.Type) (reflect.Value, error) {
 	case reflect.Float64:
 		return parseFloat64(s)
 	case reflect.Bool:
-		return ParseBool(s)
+		return parseBool(s)
 	}
 	return rv, nil
 }

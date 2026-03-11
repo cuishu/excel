@@ -18,19 +18,23 @@ type Excel struct {
 	useTextStyle bool
 }
 
+// Create a new Excel instance with filename.
 func NewExcel(filename string) *Excel {
 	return &Excel{filename: filename}
 }
 
+// Create a new Excel instance with io.Reader.
 func NewExcelFromReader(r io.Reader) *Excel {
 	return &Excel{reader: r}
 }
 
+// UseTextStyle sets the style of the cell to text.
 func (e *Excel) UseTextStyle() *Excel {
 	e.useTextStyle = true
 	return e
 }
 
+// Offset sets the offset of the first row to read.
 func (e *Excel) Offset(n int) *Excel {
 	e.offset = n
 	return e
@@ -53,6 +57,7 @@ func (e Excel) excelizeOpen() (*excelize.File, error) {
 	return nil, errors.New("filename can not be empty")
 }
 
+// Scan reads the data from the Excel file and stores it in the struct pointed to by Slice.
 func (e Excel) Scan(v any) error {
 	rv := reflect.ValueOf(v)
 
@@ -106,6 +111,7 @@ func (e *Excel) export(f *excelize.File, v any) error {
 	return nil
 }
 
+// Export exports the struct pointed to by Slice to an byte buffer.
 func (e Excel) Export(v any) (*bytes.Buffer, error) {
 	f := excelize.NewFile()
 	defer f.Close()
@@ -115,6 +121,7 @@ func (e Excel) Export(v any) (*bytes.Buffer, error) {
 	return f.WriteToBuffer()
 }
 
+// Export exports the struct pointed to by Slice to an io.Writer.
 func (e Excel) ExportTo(w io.Writer, v any) error {
 	f := excelize.NewFile()
 	defer f.Close()
@@ -162,6 +169,7 @@ func (e *Excel) streamExport(f *excelize.File, v any) error {
 	return nil
 }
 
+// StreamExport exports the struct pointed to by Slice to an byte buffer.
 func (e Excel) StreamExport(v any) (*bytes.Buffer, error) {
 	f := excelize.NewFile()
 	defer f.Close()
@@ -171,6 +179,7 @@ func (e Excel) StreamExport(v any) (*bytes.Buffer, error) {
 	return f.WriteToBuffer()
 }
 
+// StreamExport exports the struct pointed to by Slice to an io.Writer.
 func (e Excel) StreamExportTo(w io.Writer, v any) error {
 	f := excelize.NewFile()
 	defer f.Close()

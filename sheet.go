@@ -55,33 +55,40 @@ type Sheet struct {
 	collectErrors bool
 }
 
+// NewSheet creates a new Sheet.
 func NewSheet(sheet string) *Sheet {
 	return &Sheet{sheet: sheet}
 }
 
+// NewSheetFromFile creates a new Sheet from a file.
 func NewSheetFromFile(filename, sheet string) *Sheet {
 	return &Sheet{sheet: sheet, filename: filename}
 }
 
+// NewSheetFromReader creates a new Sheet from a io.Reader.
 func NewSheetFromReader(r io.Reader, sheet string) *Sheet {
 	return &Sheet{sheet: sheet, reader: r}
 }
 
+// UseTextStyle sets the style of the cell to text.
 func (s *Sheet) UseTextStyle() *Sheet {
 	s.useTextStyle = true
 	return s
 }
 
+// CollectErrors collects errors while scanning the sheet.
 func (s *Sheet) CollectErrors() *Sheet {
 	s.collectErrors = true
 	return s
 }
 
+// Offset sets the offset of the sheet.
 func (s *Sheet) Offset(n int) *Sheet {
 	s.offset = n
 	return s
 }
 
+// Errors returns the errors collected while scanning the sheet.
 func (s *Sheet) Errors() []Error {
 	return s.errors
 }
@@ -457,6 +464,7 @@ func (s *Sheet) export(f *excelize.File, v any) error {
 	return nil
 }
 
+// Export exports the sheet to a bytes.Buffer.
 func (s *Sheet) Export(v any) (*bytes.Buffer, error) {
 	f := excelize.NewFile()
 	defer f.Close()
@@ -473,6 +481,7 @@ func (s *Sheet) Export(v any) (*bytes.Buffer, error) {
 	return f.WriteToBuffer()
 }
 
+// ExportTo exports the sheet to a io.Writer.
 func (s *Sheet) ExportTo(w io.Writer, v any) error {
 	f := excelize.NewFile()
 	defer f.Close()
@@ -490,6 +499,7 @@ func (s *Sheet) ExportTo(w io.Writer, v any) error {
 	return err
 }
 
+// Filter sets the filter of the sheet.
 func (s *Sheet) Filter(schema Schema) *Sheet {
 	s.filter = schema
 	return s
