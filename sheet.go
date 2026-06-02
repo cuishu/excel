@@ -112,9 +112,9 @@ func (s *Sheet) excelizeOpen() (*excelize.File, error) {
 	return nil, errors.New("filename can not be empty")
 }
 
-func (s *Sheet) scanTime(f *excelize.File, col int, i int, elem string, value string, obj map[string]string, tag string, date1904 bool) (time.Time, error) {
+func (s *Sheet) scanTime(f *excelize.File, col int, i int, elem string, value string, date1904 bool) (time.Time, error) {
 	if elem == value {
-		cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
+		cellName, err := excelize.CoordinatesToCellName(col, i+s.offset+1)
 		if err != nil {
 			return time.Time{}, err
 		}
@@ -136,15 +136,129 @@ func (s *Sheet) scanTime(f *excelize.File, col int, i int, elem string, value st
 	return time.Time{}, nil
 }
 
+func isDate1904(props excelize.WorkbookPropsOptions) bool {
+	var date1904 bool
+	if props.Date1904 != nil {
+		date1904 = *props.Date1904
+	}
+	return date1904
+}
+
+type dataArray struct {
+	array    []reflect.Value
+	indexArr []int
+}
+
+func newDataArray(length int) dataArray {
+	return dataArray{
+		array:    make([]reflect.Value, length-1, length),
+		indexArr: make([]int, 0, length),
+	}
+}
+
+func createObjectMap(schema []string, row []string) map[string]string {
+	obj := make(map[string]string)
+	for j, cell := range row {
+		value := strings.TrimSpace(cell)
+		if j >= len(schema) {
+			continue
+		}
+		obj[schema[j]] = value
+	}
+	return obj
+}
+
+func (s *Sheet) scanRow(f *excelize.File, t reflect.Type, row []string, obj map[string]string, o reflect.Value, i int, date1904 bool) error {
+	for j := 0; j < t.NumField(); j++ {
+		if !s.collectErrors && len(s.errors) > 0 {
+			return s.errors[0]
+		}
+		tag := getFieldName(t.Field(j))
+		valid := t.Field(j).Tag.Get("validate")
+		field := o.Elem().Field(j).Addr().Interface()
+		fieldInterface := o.Elem().Field(j).Interface()
+		fieldType := reflect.TypeOf(field)
+		value, ok := obj[tag]
+		if !ok {
+			if _, ok := fieldInterface.(Picture); ok {
+				var pictures []Picture
+				var err error
+
+				pics, err := f.GetPictures(s.sheet, cell(i+1, j+1))
+				if err != nil {
+					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: err.Error()})
+					continue
+				}
+				pictures = functools.Map(func(pic excelize.Picture) Picture {
+					return Picture{
+						File:     pic.File,
+						Format:   (*PicFormat)(pic.Format),
+						withPath: false,
+					}
+				}, pics)
+				if len(pictures) != 0 {
+					rv := reflect.ValueOf(pictures[0])
+					o.Elem().Field(j).Set(rv)
+				}
+			}
+			continue
+		}
+
+		if f, ok := field.(XLSXUnmarshaler); ok {
+			if err := f.UnmarshalXLSX([]byte(value)); err != nil {
+				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+				continue
+			}
+			goto validate
+		} else if f, ok := field.(encoding.TextUnmarshaler); ok {
+			if err := f.UnmarshalText([]byte(value)); err != nil {
+				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+				continue
+			}
+			goto validate
+		}
+
+		if rv, err := getReflectValue(value, fieldType.Elem()); err == nil {
+			if _, ok := fieldInterface.(time.Time); ok {
+				// styleID := s.timeStyle(f, rv)
+				col := 0
+				functools.Map(func(elem string) struct{} {
+					col++
+					data, err := s.scanTime(f, col, i, elem, value, date1904)
+					if err != nil {
+						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+					} else {
+						o.Elem().Field(j).Set(reflect.ValueOf(data))
+					}
+					return struct{}{}
+				}, row)
+				goto validate
+			}
+			o.Elem().Field(j).Set(rv)
+		} else {
+			s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+			continue
+		}
+	validate:
+		if valid != "" {
+			value := o.Elem().Field(j).Interface()
+			if value != nil {
+				if err := validate.Var(value, valid); err != nil {
+					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+					continue
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	props, err := f.GetWorkbookProps()
 	if err != nil {
 		return err
 	}
-	var date1904 bool
-	if props.Date1904 != nil {
-		date1904 = *props.Date1904
-	}
+	date1904 := isDate1904(props)
 
 	t := rv.Type().Elem().Elem()
 
@@ -159,8 +273,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	}
 	rows = rows[s.offset:]
 	length = len(rows)
-	array := reflect.MakeSlice(rv.Type().Elem(), length-1, length)
-	var indexArr []int = make([]int, 0, length)
+	var data dataArray = newDataArray(length)
 	n := 0
 	for i, row := range rows {
 		var obj map[string]string = make(map[string]string)
@@ -168,96 +281,21 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 			schema = append(schema, functools.Map(func(s string) string { return strings.TrimSpace(s) }, row)...)
 			continue
 		}
-		for j, cell := range row {
-			value := strings.TrimSpace(cell)
-			if j >= len(schema) {
-				continue
-			}
-			obj[schema[j]] = value
-		}
+		obj = createObjectMap(schema, row)
 		if len(obj) == 0 {
 			continue
 		}
-		indexArr = append(indexArr, i-1)
+		data.indexArr = append(data.indexArr, i-1)
 		n++
 		o := reflect.New(t)
-		for j := 0; j < t.NumField(); j++ {
-			if !s.collectErrors && len(s.errors) > 0 {
-				return s.errors[0]
-			}
-			tag := getFieldName(t.Field(j))
-			valid := t.Field(j).Tag.Get("validate")
-			field := o.Elem().Field(j).Addr().Interface()
-			fieldType := reflect.TypeOf(field)
-			value, ok := obj[tag]
-			if !ok {
-				continue
-			}
-
-			if f, ok := field.(XLSXUnmarshaler); ok {
-				if err := f.UnmarshalXLSX([]byte(value)); err != nil {
-					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-					continue
-				}
-				goto validate
-			} else if f, ok := field.(encoding.TextUnmarshaler); ok {
-				if err := f.UnmarshalText([]byte(value)); err != nil {
-					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-					continue
-				}
-				goto validate
-			}
-			if rv, err := getReflectValue(value, fieldType.Elem()); err == nil {
-				if isTime(fieldType.Elem()) {
-					// styleID := s.timeStyle(f, rv)
-					for col, elem := range row {
-						data, err := s.scanTime(f, col, i, elem, value, obj, tag, date1904)
-						if err != nil {
-							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-						} else {
-							o.Elem().Field(j).Set(reflect.ValueOf(data))
-						}
-					}
-					goto validate
-				}
-				if fieldType.Elem() == picReflectType {
-					var pictures []Picture
-					var err error
-					pics, err := f.GetPictures(s.sheet, cell(i+1, j))
-					if err != nil {
-						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: err.Error()})
-						continue
-					}
-					pictures = functools.Map(func(pic excelize.Picture) Picture {
-						return Picture{
-							File:     pic.File,
-							Format:   (*PicFormat)(pic.Format),
-							withPath: false,
-						}
-					}, pics)
-					rv = reflect.ValueOf(pictures)
-				}
-				o.Elem().Field(j).Set(rv)
-			} else {
-				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-				continue
-			}
-		validate:
-			if valid != "" {
-				value := o.Elem().Field(j).Interface()
-				if value != nil {
-					if err := validate.Var(value, valid); err != nil {
-						s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-						continue
-					}
-				}
-			}
+		if err := s.scanRow(f, t, row, obj, o, i, date1904); err != nil {
+			return err
 		}
-		array.Index(i - 1).Set(o.Elem())
+		data.array[i-1] = o.Elem()
 	}
 	items := reflect.MakeSlice(rv.Type().Elem(), n, n)
-	for i, index := range indexArr {
-		items.Index(i).Set(array.Index(index))
+	for i, index := range data.indexArr {
+		items.Index(i).Set(data.array[index])
 	}
 	rv.Elem().Set(items)
 	if len(s.errors) > 0 {

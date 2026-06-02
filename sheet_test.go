@@ -241,3 +241,41 @@ func TestTime(t *testing.T) {
 	os.WriteFile("b.xlsx", data.Bytes(), 0644)
 	t.Fail()
 }
+
+type PictureTest struct {
+	Name    string  `xlsx:"name"`
+	Picture Picture `xlsx:"picture"`
+}
+
+func TestPictureExport(t *testing.T) {
+	var pics []PictureTest
+	pic := NewPicture("a.png", nil)
+	for i := 0; i < 10; i++ {
+		pics = append(pics, PictureTest{
+			Name:    fmt.Sprintf("name%d", i),
+			Picture: pic,
+		})
+	}
+	buff, err := NewSheet("Sheet3").Export(&pics)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	os.WriteFile("a.xlsx", buff.Bytes(), 0644)
+	// os.Remove("a.xlsx")
+}
+
+func TestPictureScan(t *testing.T) {
+	var pics []PictureTest
+	e := Sheet{filename: "a.xlsx", sheet: "Sheet3"}
+	err := e.CollectErrors().Scan(&pics)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	fmt.Println(e.errors)
+	for _, p := range pics {
+		fmt.Println(p.Name, p.Picture)
+	}
+	t.Fail()
+}
