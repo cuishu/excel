@@ -112,6 +112,30 @@ func (s *Sheet) excelizeOpen() (*excelize.File, error) {
 	return nil, errors.New("filename can not be empty")
 }
 
+func (s *Sheet) scanTime(f *excelize.File, col int, i int, elem string, value string, obj map[string]string, tag string, date1904 bool) (time.Time, error) {
+	if elem == value {
+		cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
+		if err != nil {
+			return time.Time{}, err
+		}
+		// f.SetCellStyle(s.Sheet, cellName, cellName, styleID)
+		value, err := f.GetCellValue(s.sheet, cellName, excelize.Options{RawCellValue: true})
+		if err != nil {
+			return time.Time{}, err
+		}
+		v, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return time.Time{}, err
+		}
+		t, err := excelize.ExcelDateToTime(v, date1904)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return t, nil
+	}
+	return time.Time{}, nil
+}
+
 func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	props, err := f.GetWorkbookProps()
 	if err != nil {
@@ -187,29 +211,11 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 				if isTime(fieldType.Elem()) {
 					// styleID := s.timeStyle(f, rv)
 					for col, elem := range row {
-						if elem == value {
-							cellName, err := excelize.CoordinatesToCellName(col+1, i+s.offset+1)
-							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-								continue
-							}
-							// f.SetCellStyle(s.Sheet, cellName, cellName, styleID)
-							value, err := f.GetCellValue(s.sheet, cellName, excelize.Options{RawCellValue: true})
-							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-								continue
-							}
-							v, err := strconv.ParseFloat(value, 64)
-							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-								continue
-							}
-							t, err := excelize.ExcelDateToTime(v, date1904)
-							if err != nil {
-								s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-								continue
-							}
-							o.Elem().Field(j).Set(reflect.ValueOf(t))
+						data, err := s.scanTime(f, col, i, elem, value, obj, tag, date1904)
+						if err != nil {
+							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+						} else {
+							o.Elem().Field(j).Set(reflect.ValueOf(data))
 						}
 					}
 					goto validate
@@ -349,19 +355,18 @@ func (s *Sheet) exportCell(f *excelize.File, c Cell, col column) error {
 }
 
 func (s *Sheet) exportStruct(f *excelize.File, field any, col column) error {
-	fieldInterface := field //.Interface()
 	if pic, ok := field.(Picture); ok {
 		return s.exportPic(f, pic, col)
 	} else if cell, ok := field.(Cell); ok {
 		return s.exportCell(f, cell, col)
 	}
-	if fun, ok := fieldInterface.(XLSXMarshaler); ok {
+	if fun, ok := field.(XLSXMarshaler); ok {
 		data, err := fun.MarshalXLSX()
 		if err != nil {
 			return err
 		}
 		f.SetCellStr(s.sheet, col(), string(data))
-	} else if fun, ok := fieldInterface.(encoding.TextMarshaler); ok {
+	} else if fun, ok := field.(encoding.TextMarshaler); ok {
 		data, err := fun.MarshalText()
 		if err != nil {
 			return err
