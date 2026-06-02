@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -52,6 +53,38 @@ func (sex *Sex) UnmarshalXLSX(data []byte) error {
 		return nil
 	}
 	return errors.New("invalid value")
+}
+
+// BenchmarkSexRefelectMarshalUnmarshal-8   	  750324	      4946 ns/op	     192 B/op	       6 allocs/op
+// PASS
+// ok  	github.com/cuishu/excel	3.751s
+func BenchmarkSexRefelectMarshalUnmarshal(b *testing.B) {
+	var sex Sex
+	rt := reflect.TypeOf(sex)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, ok := rt.MethodByName("MarshalXLSX")
+		if !ok {
+			b.FailNow()
+		}
+		f.Func.Call([]reflect.Value{reflect.ValueOf(sex)})
+	}
+}
+
+// BenchmarkSexAssertMarshalUnmarshal-8   	273795409	         4.034 ns/op	       0 B/op	       0 allocs/op
+// PASS
+// ok  	github.com/cuishu/excel	1.577s
+func BenchmarkSexAssertMarshalUnmarshal(b *testing.B) {
+	var sex Sex
+	// var inter any = &sex
+	rv := reflect.ValueOf(sex)
+	for i := 0; i < b.N; i++ {
+		t, ok := rv.Interface().(XLSXMarshaler)
+		if !ok {
+			b.FailNow()
+		}
+		t.MarshalXLSX()
+	}
 }
 
 type Time struct {
@@ -174,6 +207,27 @@ type TestTimeObject struct {
 	Sex  Sex       `xlsx:"sex" binding:"oneof=1 2"`
 	Age  int       `xlsx:"age"`
 	Time time.Time `xlsx:"time"`
+}
+
+func TestTimeMarshal(t *testing.T) {
+	var tto []TestTimeObject
+	for i := 0; i < 10; i++ {
+		tto = append(tto, TestTimeObject{
+			Name: fmt.Sprintf("name%d", i),
+			Sex:  Male,
+			Age:  i,
+			Time: time.Now(),
+		})
+	}
+	e := &Sheet{filename: "a.xlsx", sheet: "Sheet3"}
+	e.UseTextStyle()
+	buff, err := e.Export(&tto)
+	if err != nil {
+		fmt.Println(err.Error())
+		t.FailNow()
+	}
+	os.WriteFile("a.xlsx", buff.Bytes(), 0644)
+	t.Fail()
 }
 
 func TestTime(t *testing.T) {

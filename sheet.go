@@ -2,6 +2,7 @@ package excel
 
 import (
 	"bytes"
+	"encoding"
 	"errors"
 	"fmt"
 	_ "image/jpeg"
@@ -10,12 +11,21 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cuishu/functools"
 	excelize "github.com/xuri/excelize/v2"
 )
 
 const defaultSheet = "Sheet1"
+
+type XLSXMarshaler interface {
+	MarshalXLSX() ([]byte, error)
+}
+
+type XLSXUnmarshaler interface {
+	UnmarshalXLSX(data []byte) error
+}
 
 type Schema map[string]bool
 
@@ -155,29 +165,23 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 			valid := t.Field(j).Tag.Get("validate")
 			field := o.Elem().Field(j).Addr().Interface()
 			fieldType := reflect.TypeOf(field)
-			fieldValue := reflect.ValueOf(field)
 			value, ok := obj[tag]
 			if !ok {
 				continue
 			}
-			if fieldType.NumMethod() > 0 {
-				f, ok := fieldType.MethodByName("UnmarshalXLSX")
-				if !ok {
-					f, ok = fieldType.MethodByName("UnmarshalText")
+
+			if f, ok := field.(XLSXUnmarshaler); ok {
+				if err := f.UnmarshalXLSX([]byte(value)); err != nil {
+					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+					continue
 				}
-				if ok {
-					in := reflect.New(f.Type.In(1)).Elem()
-					in.SetBytes([]byte(value))
-					values := f.Func.Call([]reflect.Value{fieldValue, in})
-					if len(values) > 0 {
-						err := values[0].Interface()
-						if err != nil {
-							s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.(error).Error())})
-							continue
-						}
-					}
-					goto validate
+				goto validate
+			} else if f, ok := field.(encoding.TextUnmarshaler); ok {
+				if err := f.UnmarshalText([]byte(value)); err != nil {
+					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+					continue
 				}
+				goto validate
 			}
 			if rv, err := getReflectValue(value, fieldType.Elem()); err == nil {
 				if isTime(fieldType.Elem()) {
@@ -309,8 +313,7 @@ func (s *Sheet) exportTitle(f *excelize.File, schema Schema, sheet string, t ref
 	}
 }
 
-func (s *Sheet) exportPic(f *excelize.File, field reflect.Value, col column) error {
-	pic := field.Interface().(Picture)
+func (s *Sheet) exportPic(f *excelize.File, pic Picture, col column) error {
 	if pic.withPath {
 		if err := f.AddPicture(s.sheet, col(), pic.Name, (*excelize.GraphicOptions)(pic.Format)); err != nil {
 			return err
@@ -327,8 +330,7 @@ func (s *Sheet) exportPic(f *excelize.File, field reflect.Value, col column) err
 	return nil
 }
 
-func (s *Sheet) exportCell(f *excelize.File, field reflect.Value, col column) error {
-	c := field.Interface().(Cell)
+func (s *Sheet) exportCell(f *excelize.File, c Cell, col column) error {
 	if c.HyperLink.Link != "" {
 		column := col()
 		f.SetCellStr(s.sheet, column, c.Value)
@@ -346,28 +348,27 @@ func (s *Sheet) exportCell(f *excelize.File, field reflect.Value, col column) er
 	return nil
 }
 
-func (s *Sheet) exportStruct(f *excelize.File, field reflect.Value, col column) error {
-	if field.Type() == picReflectType {
-		return s.exportPic(f, field, col)
-	} else if field.Type() == cellReflectType {
-		return s.exportCell(f, field, col)
+func (s *Sheet) exportStruct(f *excelize.File, field any, col column) error {
+	fieldInterface := field //.Interface()
+	if pic, ok := field.(Picture); ok {
+		return s.exportPic(f, pic, col)
+	} else if cell, ok := field.(Cell); ok {
+		return s.exportCell(f, cell, col)
 	}
-	fun, ok := field.Type().MethodByName("MarshalXLSX")
-	if !ok {
-		fun, ok = field.Type().MethodByName("MarshalText")
-	}
-	if ok {
-		res := fun.Func.Call([]reflect.Value{field})
-		if res[1].Interface() != nil {
-			err, ok := res[1].Interface().(error)
-			if !ok {
-				return fmt.Errorf("%s has invalid return type", fun.Name)
-			}
+	if fun, ok := fieldInterface.(XLSXMarshaler); ok {
+		data, err := fun.MarshalXLSX()
+		if err != nil {
 			return err
 		}
-		f.SetCellStr(s.sheet, col(), toString(res[0].Interface()))
-	} else if isTime(field.Type()) {
-		f.SetCellValue(s.sheet, col(), field.Interface())
+		f.SetCellStr(s.sheet, col(), string(data))
+	} else if fun, ok := fieldInterface.(encoding.TextMarshaler); ok {
+		data, err := fun.MarshalText()
+		if err != nil {
+			return err
+		}
+		f.SetCellStr(s.sheet, col(), string(data))
+	} else if t, ok := field.(time.Time); ok {
+		f.SetCellValue(s.sheet, col(), t)
 	} else {
 		panic("struct type must implement MarshalXLSX or MarshalText")
 	}
@@ -378,35 +379,34 @@ func (s *Sheet) exportRow(f *excelize.File, obj reflect.Value, col column) error
 	t := obj.Type()
 	for i := 0; i < obj.NumField(); i++ {
 		field := obj.Field(i)
+		fieldInterface := field.Interface()
 		if field.Kind() == reflect.Struct {
-			if err := s.exportStruct(f, field, col); err != nil {
+			if err := s.exportStruct(f, fieldInterface, col); err != nil {
 				return err
 			}
 		} else {
 			tag := getFieldName(t.Field(i))
 			show, ok := s.filter[tag]
 			if (len(s.filter) == 0) || (show && ok) {
-				if field.NumMethod() > 0 {
-					fun, ok := field.Type().MethodByName("MarshalXLSX")
-					if !ok {
-						fun, ok = field.Type().MethodByName("MarshalText")
+				if fun, ok := fieldInterface.(XLSXMarshaler); ok {
+					data, err := fun.MarshalXLSX()
+					if err != nil {
+						return err
 					}
-					if ok {
-						res := fun.Func.Call([]reflect.Value{field})
-						if res[1].Interface() != nil {
-							err, ok := res[1].Interface().(error)
-							if !ok {
-								return fmt.Errorf("%s has invalid return type", fun.Name)
-							}
-							return err
-						}
-						colIdx := col()
-						f.SetCellStr(s.sheet, colIdx, toString(res[0].Interface()))
-						continue
+					colIdx := col()
+					f.SetCellStr(s.sheet, colIdx, string(data))
+					continue
+				} else if fun, ok := fieldInterface.(encoding.TextMarshaler); ok {
+					data, err := fun.MarshalText()
+					if err != nil {
+						return err
 					}
+					colIdx := col()
+					f.SetCellStr(s.sheet, colIdx, string(data))
+					continue
 				}
 				colIdx := col()
-				f.SetCellStr(s.sheet, colIdx, toString(field.Interface()))
+				f.SetCellStr(s.sheet, colIdx, toString(fieldInterface))
 			}
 		}
 	}

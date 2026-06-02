@@ -1,8 +1,6 @@
 package excel
 
 import (
-	"reflect"
-
 	excelize "github.com/xuri/excelize/v2"
 )
 
@@ -23,5 +21,3 @@ type Cell struct {
 	HyperLink HyperLink
 	Style     *excelize.Style
 }
-
-var cellReflectType = reflect.TypeOf(Cell{})

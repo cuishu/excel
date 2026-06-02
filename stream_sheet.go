@@ -2,9 +2,10 @@ package excel
 
 import (
 	"bytes"
-	"fmt"
+	"encoding"
 	"io"
 	"reflect"
+	"time"
 
 	"github.com/cuishu/functools"
 	excelize "github.com/xuri/excelize/v2"
@@ -25,28 +26,22 @@ func (s *Sheet) streamExportTitle(writer *excelize.StreamWriter, schema Schema, 
 	}, title))
 }
 
-func (s *Sheet) streamExportStruct(field reflect.Value) (any, error) {
-	if field.Type() == picReflectType {
+func (s *Sheet) streamExportStruct(field any) (any, error) {
+	if _, ok := field.(Picture); ok {
 		panic("pic type not support")
-	} else if field.Type() == cellReflectType {
+	} else if _, ok := field.(Cell); ok {
 		panic("cell type not support")
 	}
-	fun, ok := field.Type().MethodByName("MarshalXLSX")
-	if !ok {
-		fun, ok = field.Type().MethodByName("MarshalText")
-	}
-	if ok {
-		res := fun.Func.Call([]reflect.Value{field})
-		if res[1].Interface() != nil {
-			err, ok := res[1].Interface().(error)
-			if !ok {
-				return nil, fmt.Errorf("%s has invalid return type", fun.Name)
-			}
+	if fun, ok := field.(XLSXMarshaler); ok {
+		data, err := fun.MarshalXLSX()
+		if err != nil {
 			return nil, err
 		}
-		return toString(res[0].Interface()), nil
-	} else if isTime(field.Type()) {
-		return field.Interface(), nil
+		return data, nil
+	} else if fun, ok := field.(encoding.TextMarshaler); ok {
+		return fun.MarshalText()
+	} else if t, ok := field.(time.Time); ok {
+		return t, nil
 	} else {
 		panic("struct type must implement MarshalXLSX or MarshalText")
 	}
@@ -57,8 +52,9 @@ func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value
 	t := obj.Type()
 	for i := 0; i < obj.NumField(); i++ {
 		field := obj.Field(i)
+		fieldInterface := field.Interface()
 		if field.Kind() == reflect.Struct {
-			if data, err := s.streamExportStruct(field); err != nil {
+			if data, err := s.streamExportStruct(fieldInterface); err != nil {
 				return err
 			} else {
 				rowData = append(rowData, data)
@@ -67,25 +63,22 @@ func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value
 			tag := getFieldName(t.Field(i))
 			show, ok := s.filter[tag]
 			if (len(s.filter) == 0) || (show && ok) {
-				if field.NumMethod() > 0 {
-					fun, ok := field.Type().MethodByName("MarshalXLSX")
-					if !ok {
-						fun, ok = field.Type().MethodByName("MarshalText")
+				if fun, ok := fieldInterface.(XLSXMarshaler); ok {
+					data, err := fun.MarshalXLSX()
+					if err != nil {
+						return err
 					}
-					if ok {
-						res := fun.Func.Call([]reflect.Value{field})
-						if res[1].Interface() != nil {
-							err, ok := res[1].Interface().(error)
-							if !ok {
-								return fmt.Errorf("%s has invalid return type", fun.Name)
-							}
-							return err
-						}
-						rowData = append(rowData, toString(res[0].Interface()))
-						continue
+					rowData = append(rowData, string(data))
+					continue
+				} else if fun, ok := fieldInterface.(encoding.TextMarshaler); ok {
+					data, err := fun.MarshalText()
+					if err != nil {
+						return err
 					}
+					rowData = append(rowData, string(data))
+					continue
 				}
-				rowData = append(rowData, toString(field.Interface()))
+				rowData = append(rowData, toString(fieldInterface))
 			}
 		}
 	}
