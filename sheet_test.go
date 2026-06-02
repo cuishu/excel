@@ -203,20 +203,22 @@ func TestOffset(t *testing.T) {
 }
 
 type TestTimeObject struct {
-	Name string    `xlsx:"name" binding:"required"`
-	Sex  Sex       `xlsx:"sex" binding:"oneof=1 2"`
-	Age  int       `xlsx:"age"`
-	Time time.Time `xlsx:"time"`
+	Name  string    `xlsx:"name" binding:"required"`
+	Sex   Sex       `xlsx:"sex" binding:"oneof=1 2"`
+	Age   int       `xlsx:"age"`
+	Time  time.Time `xlsx:"time"`
+	Time1 Time      `xlsx:"time1"`
 }
 
 func TestTimeMarshal(t *testing.T) {
 	var tto []TestTimeObject
 	for i := 0; i < 10; i++ {
 		tto = append(tto, TestTimeObject{
-			Name: fmt.Sprintf("name%d", i),
-			Sex:  Male,
-			Age:  i,
-			Time: time.Now(),
+			Name:  fmt.Sprintf("name%d", i),
+			Sex:   Male,
+			Age:   i,
+			Time:  time.Now(),
+			Time1: Time{time.Now()},
 		})
 	}
 	e := &Sheet{filename: "a.xlsx", sheet: "Sheet3"}
@@ -235,7 +237,7 @@ func TestTime(t *testing.T) {
 	var ss []TestTimeObject
 	e.Scan(&ss)
 	for _, s := range ss {
-		fmt.Println(s.Name, s.Sex, s.Time)
+		fmt.Println(s.Name, s.Sex, s.Time, s.Time1.Time)
 	}
 	data, _ := e.Export(&ss)
 	os.WriteFile("b.xlsx", data.Bytes(), 0644)

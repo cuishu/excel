@@ -168,6 +168,51 @@ func createObjectMap(schema []string, row []string) map[string]string {
 	return obj
 }
 
+func (s *Sheet) scanPicture(f *excelize.File, i int, j int) (reflect.Value, error) {
+	var pictures []Picture
+	var err error
+
+	pics, err := f.GetPictures(s.sheet, cell(i+1, j+1))
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	pictures = functools.Map(func(pic excelize.Picture) Picture {
+		return Picture{
+			File:     pic.File,
+			Format:   (*PicFormat)(pic.Format),
+			withPath: false,
+		}
+	}, pics)
+	if len(pictures) != 0 {
+		return reflect.ValueOf(pictures[0]), nil
+	}
+	return reflect.Value{}, nil
+}
+
+func (s *Sheet) validate(value any, valid string) error {
+	if valid != "" {
+		if value != nil {
+			return validate.Var(value, valid)
+		}
+	}
+	return nil
+}
+
+func (s *Sheet) marshaler(field any, value string) (bool, error) {
+	if f, ok := field.(XLSXUnmarshaler); ok {
+		if err := f.UnmarshalXLSX([]byte(value)); err != nil {
+			return false, err
+		}
+		return true, nil
+	} else if f, ok := field.(encoding.TextUnmarshaler); ok {
+		if err := f.UnmarshalText([]byte(value)); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 func (s *Sheet) scanRow(f *excelize.File, t reflect.Type, row []string, obj map[string]string, o reflect.Value, i int, date1904 bool) error {
 	for j := 0; j < t.NumField(); j++ {
 		if !s.collectErrors && len(s.errors) > 0 {
@@ -180,41 +225,21 @@ func (s *Sheet) scanRow(f *excelize.File, t reflect.Type, row []string, obj map[
 		fieldType := reflect.TypeOf(field)
 		value, ok := obj[tag]
 		if !ok {
-			if _, ok := fieldInterface.(Picture); ok {
-				var pictures []Picture
-				var err error
-
-				pics, err := f.GetPictures(s.sheet, cell(i+1, j+1))
-				if err != nil {
-					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: err.Error()})
-					continue
-				}
-				pictures = functools.Map(func(pic excelize.Picture) Picture {
-					return Picture{
-						File:     pic.File,
-						Format:   (*PicFormat)(pic.Format),
-						withPath: false,
-					}
-				}, pics)
-				if len(pictures) != 0 {
-					rv := reflect.ValueOf(pictures[0])
-					o.Elem().Field(j).Set(rv)
-				}
+			if _, ok := fieldInterface.(Picture); !ok {
+				continue
+			}
+			if rv, err := s.scanPicture(f, i, j); err != nil {
+				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: err.Error()})
+			} else {
+				o.Elem().Field(j).Set(rv)
 			}
 			continue
 		}
 
-		if f, ok := field.(XLSXUnmarshaler); ok {
-			if err := f.UnmarshalXLSX([]byte(value)); err != nil {
-				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-				continue
-			}
-			goto validate
-		} else if f, ok := field.(encoding.TextUnmarshaler); ok {
-			if err := f.UnmarshalText([]byte(value)); err != nil {
-				s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-				continue
-			}
+		if needValidate, err := s.marshaler(field, value); err != nil {
+			s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
+			continue
+		} else if needValidate {
 			goto validate
 		}
 
@@ -240,14 +265,8 @@ func (s *Sheet) scanRow(f *excelize.File, t reflect.Type, row []string, obj map[
 			continue
 		}
 	validate:
-		if valid != "" {
-			value := o.Elem().Field(j).Interface()
-			if value != nil {
-				if err := validate.Var(value, valid); err != nil {
-					s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
-					continue
-				}
-			}
+		if err := s.validate(o.Elem().Field(j).Interface(), valid); err != nil {
+			s.errors = append(s.errors, Error{Row: Row{ID: i, Data: obj}, mesg: fmt.Sprintf("%s: %s", tag, err.Error())})
 		}
 	}
 	return nil
@@ -276,12 +295,11 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	var data dataArray = newDataArray(length)
 	n := 0
 	for i, row := range rows {
-		var obj map[string]string = make(map[string]string)
 		if i == 0 {
 			schema = append(schema, functools.Map(func(s string) string { return strings.TrimSpace(s) }, row)...)
 			continue
 		}
-		obj = createObjectMap(schema, row)
+		obj := createObjectMap(schema, row)
 		if len(obj) == 0 {
 			continue
 		}
