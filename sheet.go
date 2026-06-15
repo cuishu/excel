@@ -247,7 +247,7 @@ func (s *Sheet) scanRow(f *excelize.File, t reflect.Type, row []string, obj map[
 			if _, ok := fieldInterface.(time.Time); ok {
 				// styleID := s.timeStyle(f, rv)
 				col := 0
-				functools.Map(func(elem string) struct{} {
+				functools.ForEach(row, func(elem string) {
 					col++
 					data, err := s.scanTime(f, col, i, elem, value, date1904)
 					if err != nil {
@@ -255,8 +255,7 @@ func (s *Sheet) scanRow(f *excelize.File, t reflect.Type, row []string, obj map[
 					} else {
 						o.Elem().Field(j).Set(reflect.ValueOf(data))
 					}
-					return struct{}{}
-				}, row)
+				})
 				goto validate
 			}
 			o.Elem().Field(j).Set(rv)

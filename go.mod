@@ -3,7 +3,7 @@ module github.com/cuishu/excel
 go 1.26.2
 
 require (
-	github.com/cuishu/functools v0.0.0-20260316063106-97db0c5fa42f
+	github.com/cuishu/functools v0.0.0-20260615124708-6c26d424e037
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/xuri/excelize/v2 v2.10.1

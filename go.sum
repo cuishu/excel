@@ -1,5 +1,7 @@
 github.com/cuishu/functools v0.0.0-20260316063106-97db0c5fa42f h1:0FEqTwG3RVU/TWIMzkkQlnNn/vPckYrpocjkzc1K+0U=
 github.com/cuishu/functools v0.0.0-20260316063106-97db0c5fa42f/go.mod h1:L+yg4uu+GXqiH05ltA2CuS+SAhMRW4JyRrrNZO8Y2Uo=
+github.com/cuishu/functools v0.0.0-20260615124708-6c26d424e037 h1:IkJ93/f0j8oqIAWK4B1X906FR9rzDrvVmo+wNHQlcpU=
+github.com/cuishu/functools v0.0.0-20260615124708-6c26d424e037/go.mod h1:L+yg4uu+GXqiH05ltA2CuS+SAhMRW4JyRrrNZO8Y2Uo=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gabriel-vasile/mimetype v1.4.13 h1:46nXokslUBsAJE/wMsp5gtO500a4F3Nkz9Ufpk2AcUM=
