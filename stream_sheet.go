@@ -17,13 +17,13 @@ func (s *Sheet) streamExportTitle(writer *excelize.StreamWriter, schema Schema, 
 	if s.useTextStyle {
 		writer.SetColStyle(1, s.colCnt, s.style)
 	}
-	return writer.SetRow("A1", functools.Map(func(v string) any {
+	return writer.SetRow("A1", functools.Map(title, func(v string) any {
 		return &excelize.Cell{
 			StyleID: s.style,
 			Formula: "",
 			Value:   v,
 		}
-	}, title))
+	}))
 }
 
 func (s *Sheet) streamExportStruct(field any) (any, error) {
@@ -82,13 +82,13 @@ func (s *Sheet) streamExportRow(writer *excelize.StreamWriter, obj reflect.Value
 			}
 		}
 	}
-	if err := writer.SetRow(col(), functools.Map(func(v any) any {
+	if err := writer.SetRow(col(), functools.Map(rowData, func(v any) any {
 		return &excelize.Cell{
 			StyleID: s.style,
 			Formula: "",
 			Value:   v,
 		}
-	}, rowData)); err != nil {
+	})); err != nil {
 		return err
 	}
 	return nil

@@ -176,13 +176,13 @@ func (s *Sheet) scanPicture(f *excelize.File, i int, j int) (reflect.Value, erro
 	if err != nil {
 		return reflect.Value{}, err
 	}
-	pictures = functools.Map(func(pic excelize.Picture) Picture {
+	pictures = functools.Map(pics, func(pic excelize.Picture) Picture {
 		return Picture{
 			File:     pic.File,
 			Format:   (*PicFormat)(pic.Format),
 			withPath: false,
 		}
-	}, pics)
+	})
 	if len(pictures) != 0 {
 		return reflect.ValueOf(pictures[0]), nil
 	}
@@ -295,7 +295,7 @@ func (s *Sheet) scanSheet(f *excelize.File, rv reflect.Value) error {
 	n := 0
 	for i, row := range rows {
 		if i == 0 {
-			schema = append(schema, functools.Map(func(s string) string { return strings.TrimSpace(s) }, row)...)
+			schema = append(schema, functools.Map(row, func(s string) string { return strings.TrimSpace(s) })...)
 			continue
 		}
 		obj := createObjectMap(schema, row)
