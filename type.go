@@ -8,112 +8,31 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func parseInt8(s string) (reflect.Value, error) {
+type Int interface {
+	int | int8 | int16 | int32 | int64 |
+	uint | uint8 | uint16 | uint32 | uint64
+}
+
+func parseInt[T Int](s string) (reflect.Value, error) {
 	var rv reflect.Value
 	v, err := strconv.ParseInt(s, 10, 8)
 	if err != nil {
 		return rv, err
 	}
-	return reflect.ValueOf(int8(v)), nil
+	return reflect.ValueOf(T(v)), nil
 }
 
-func parseInt16(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseInt(s, 10, 16)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(int16(v)), nil
+type Float interface {
+	float32 | float64
 }
 
-func parseInt32(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseInt(s, 10, 32)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(int32(v)), nil
-}
-
-func parseInt64(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(int64(v)), nil
-}
-
-func parseInt(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(int(v)), nil
-}
-
-func parseUint8(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseUint(s, 10, 8)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(uint8(v)), nil
-}
-
-func parseUint16(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseUint(s, 10, 16)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(uint16(v)), nil
-}
-
-func parseUint32(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseUint(s, 10, 32)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(uint32(v)), nil
-}
-
-func parseUint64(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(uint64(v)), nil
-}
-
-func parseUint(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(uint(v)), nil
-}
-
-func parseFloat32(s string) (reflect.Value, error) {
+func parseFloat[T Float](s string) (reflect.Value, error) {
 	var rv reflect.Value
 	v, err := strconv.ParseFloat(s, 32)
 	if err != nil {
 		return rv, err
 	}
-	return reflect.ValueOf(float32(v)), nil
-}
-
-func parseFloat64(s string) (reflect.Value, error) {
-	var rv reflect.Value
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return rv, err
-	}
-	return reflect.ValueOf(float64(v)), nil
+	return reflect.ValueOf(T(v)), nil
 }
 
 func parseBool(s string) (reflect.Value, error) {
@@ -131,29 +50,29 @@ func getReflectValue(s string, t reflect.Type) (reflect.Value, error) {
 	case reflect.String:
 		return reflect.ValueOf(s), nil
 	case reflect.Int8:
-		return parseInt8(s)
+		return parseInt[int8](s)
 	case reflect.Int16:
-		return parseInt16(s)
+		return parseInt[int16](s)
 	case reflect.Int32:
-		return parseInt32(s)
+		return parseInt[int32](s)
 	case reflect.Int64:
-		return parseInt64(s)
+		return parseInt[int64](s)
 	case reflect.Int:
-		return parseInt(s)
+		return parseInt[int](s)
 	case reflect.Uint8:
-		return parseUint8(s)
+		return parseInt[uint8](s)
 	case reflect.Uint16:
-		return parseUint16(s)
+		return parseInt[uint16](s)
 	case reflect.Uint32:
-		return parseUint32(s)
+		return parseInt[uint32](s)
 	case reflect.Uint64:
-		return parseUint64(s)
+		return parseInt[uint64](s)
 	case reflect.Uint:
-		return parseUint(s)
+		return parseInt[uint](s)
 	case reflect.Float32:
-		return parseFloat32(s)
+		return parseFloat[float32](s)
 	case reflect.Float64:
-		return parseFloat64(s)
+		return parseFloat[float64](s)
 	case reflect.Bool:
 		return parseBool(s)
 	}
